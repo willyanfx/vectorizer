@@ -20,10 +20,10 @@ Everything runs in the browser — **your images never leave your device.**
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173/vector/
+npm run dev      # http://localhost:5173/vectorizer/
 ```
 
-> Note the `/vector/` path — `base` is set for GitHub Pages project hosting.
+> Note the `/vectorizer/` path — `base` is set for GitHub Pages project hosting.
 
 ## Build
 
@@ -34,12 +34,12 @@ npm run preview  # serve the production build locally
 
 ## Deploy (GitHub Pages)
 
-1. Create a GitHub repo named **`vector`** (the `base` in `vite.config.ts` must
-   match the repo name — change both if you use a different name).
+1. The repo is named **`vectorizer`** and `base` in `vite.config.ts` is set to
+   `/vectorizer/` to match (they must match for project Pages hosting).
 2. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds and
    publishes automatically.
 3. In the repo: **Settings → Pages → Source → "GitHub Actions"**.
-4. Open `https://<your-user>.github.io/vector/`.
+4. Open `https://willyanfx.github.io/vectorizer/`.
 
 ### Hosting elsewhere (e.g. Vercel, root domain)
 
