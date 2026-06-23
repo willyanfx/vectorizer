@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BuyMeACoffee } from './components/BuyMeACoffee'
 import { DropZone } from './components/DropZone'
 import { ParamsPanel } from './components/ParamsPanel'
 import { OptimizePanel } from './components/OptimizePanel'
@@ -125,7 +124,6 @@ export default function App() {
           <span className={styles.tagline}>raster → SVG, in your browser</span>
         </div>
         <div className={styles.headerActions}>
-          <BuyMeACoffee />
           {hasImage && (
             <button className={styles.newBtn} onClick={() => setFile(null)}>
               New image
