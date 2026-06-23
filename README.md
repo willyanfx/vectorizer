@@ -4,6 +4,8 @@ A fully client-side single-page app that converts uploaded raster images
 (PNG/JPG/WebP/GIF/BMP) into SVG vectors with rich, tunable parameters.
 Everything runs in the browser — **your images never leave your device.**
 
+<a href="https://www.buymeacoffee.com/willyanfx" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" width="174"></a>
+
 - **Tracing:** [VTracer](https://github.com/visioncortex/vtracer) (Rust → WASM)
   for high-quality color/binary tracing, run in a **Web Worker** so the UI stays
   responsive. Automatic fallback to

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { BuyMeACoffee } from './components/BuyMeACoffee'
 import { DropZone } from './components/DropZone'
 import { ParamsPanel } from './components/ParamsPanel'
 import { OptimizePanel } from './components/OptimizePanel'
@@ -114,14 +115,23 @@ export default function App() {
       <header className={styles.header}>
         <div className={styles.brand}>
           <span className={styles.logo}>◆</span>
-          <h1>Vector</h1>
+          <h1>
+            Vector
+            <span className={styles.srOnly}>
+              {' '}— free image to SVG converter: convert PNG, JPG, WebP, GIF and
+              BMP to scalable SVG vectors in your browser
+            </span>
+          </h1>
           <span className={styles.tagline}>raster → SVG, in your browser</span>
         </div>
-        {hasImage && (
-          <button className={styles.newBtn} onClick={() => setFile(null)}>
-            New image
-          </button>
-        )}
+        <div className={styles.headerActions}>
+          <BuyMeACoffee />
+          {hasImage && (
+            <button className={styles.newBtn} onClick={() => setFile(null)}>
+              New image
+            </button>
+          )}
+        </div>
       </header>
 
       <main className={styles.main}>

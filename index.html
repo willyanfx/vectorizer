@@ -3,15 +3,126 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary SEO -->
+    <title>Image to SVG Converter — Free PNG/JPG to SVG Online | Vector</title>
     <meta
       name="description"
-      content="Convert images to SVG vectors entirely in your browser. WebGPU-accelerated, powered by VTracer (WASM). Your images never leave your device."
+      content="Free image to SVG converter. Convert PNG, JPG, WebP, GIF & BMP to clean, scalable SVG vectors online — instantly, in your browser. No upload, no sign-up, no watermark. Your images never leave your device."
     />
-    <title>Vector — raster to SVG in your browser</title>
+    <meta
+      name="keywords"
+      content="image to svg, png to svg, jpg to svg, convert image to svg, free svg converter, raster to vector, image vectorizer, svg converter online, photo to svg, jpeg to svg, webp to svg, vectorize image free"
+    />
+    <meta name="author" content="Vector" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#863bff" />
+    <link rel="canonical" href="https://willyanfx.github.io/vectorizer/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Vector" />
+    <meta property="og:title" content="Image to SVG Converter — Free PNG/JPG to SVG Online" />
+    <meta
+      property="og:description"
+      content="Convert PNG, JPG, WebP, GIF & BMP to clean, scalable SVG vectors free — instantly in your browser. No upload, no sign-up, no watermark."
+    />
+    <meta property="og:url" content="https://willyanfx.github.io/vectorizer/" />
+    <meta property="og:image" content="https://willyanfx.github.io/vectorizer/og-image.svg" />
+    <meta property="og:image:alt" content="Vector — free image to SVG converter" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Image to SVG Converter — Free PNG/JPG to SVG Online" />
+    <meta
+      name="twitter:description"
+      content="Convert PNG, JPG, WebP, GIF & BMP to clean, scalable SVG vectors free — instantly in your browser. No upload, no sign-up."
+    />
+    <meta name="twitter:image" content="https://willyanfx.github.io/vectorizer/og-image.svg" />
+
+    <!-- Structured data: SoftwareApplication + FAQ -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Vector — Image to SVG Converter",
+            "url": "https://willyanfx.github.io/vectorizer/",
+            "description": "Free online image to SVG converter. Convert PNG, JPG, WebP, GIF and BMP raster images into clean, scalable SVG vectors entirely in your browser.",
+            "applicationCategory": "DesignApplication",
+            "operatingSystem": "Any (web browser)",
+            "browserRequirements": "Requires a modern web browser with WebAssembly support.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "featureList": [
+              "Convert PNG, JPG, WebP, GIF and BMP to SVG",
+              "Runs entirely in your browser — images never uploaded",
+              "Color and black-and-white tracing",
+              "Adjustable tracing parameters",
+              "SVGO optimization to shrink SVG file size",
+              "Free with no sign-up or watermark"
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "How do I convert an image to SVG for free?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Drag and drop a PNG, JPG, WebP, GIF or BMP image onto Vector. It traces the image into a scalable SVG vector right in your browser and lets you download the result for free — no sign-up, no watermark, no upload to a server."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Are my images uploaded to a server?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Vector runs entirely client-side using WebAssembly and (when available) WebGPU. Your images are processed on your own device and never leave your browser."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which image formats can I convert to SVG?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "You can convert PNG, JPG/JPEG, WebP, GIF and BMP raster images into SVG vectors."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is the SVG output editable and scalable?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. The output is a standard SVG made of vector paths, so it scales to any size without losing quality and can be edited in tools like Figma, Illustrator or Inkscape."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Crawlable, accessible fallback. Replaced by the app once JS loads. -->
+      <noscript>
+        <h1>Vector — Free Image to SVG Converter</h1>
+        <p>
+          Vector converts PNG, JPG, WebP, GIF and BMP images into clean, scalable
+          SVG vectors entirely in your browser. Please enable JavaScript to use the
+          converter. Your images are processed on your device and are never uploaded.
+        </p>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

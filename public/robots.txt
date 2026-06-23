@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://willyanfx.github.io/vectorizer/sitemap.xml
