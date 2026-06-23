@@ -96,10 +96,44 @@ function anchorPoints(d: string): Array<[number, number]> {
 /**
  * Re-render the SVG string with view options applied. Returns a new SVG string
  * suitable for inlining. Does NOT mutate the input.
+ *
+ * @param forDisplay - When true, the SVG is made fluid for in-browser preview:
+ *   a viewBox is guaranteed (injected from width/height if VTracer omitted it)
+ *   and the fixed pixel width/height are dropped so the SVG keeps only its
+ *   intrinsic aspect ratio. An <img> then derives its ratio from the viewBox
+ *   and `object-fit: contain` scales it to the stage. (Setting width/height to
+ *   '100%' instead would strip the intrinsic size and make <img> fall back to a
+ *   300x150 default, rendering large or small images at the wrong size.)
+ *   When false (default, used by the export path), the original pixel
+ *   width/height are preserved so design tools know the intended dimensions.
  */
-export function applyView(svg: string, opts: VectorViewOptions): string {
+export function applyView(svg: string, opts: VectorViewOptions, forDisplay = false): string {
   const { doc, svgEl } = parseSvg(svg)
   if (!svgEl) return svg
+
+  // Guarantee a viewBox: VTracer emits width/height but no viewBox, which leaves
+  // the SVG unscalable. Derive "0 0 W H" from the pixel dimensions when absent.
+  if (!svgEl.getAttribute('viewBox')) {
+    // parseFloat reads the leading number, tolerating unit suffixes like "800px".
+    const wNum = parseFloat(svgEl.getAttribute('width') ?? '')
+    const hNum = parseFloat(svgEl.getAttribute('height') ?? '')
+    if (wNum > 0 && hNum > 0) {
+      svgEl.setAttribute('viewBox', `0 0 ${wNum} ${hNum}`)
+    }
+  }
+
+  if (forDisplay) {
+    // Drop fixed dimensions so the <img> sizes from the viewBox aspect ratio.
+    // Falling back to a viewBox guarantees this; if even that is missing (a
+    // malformed SVG with neither dimensions nor viewBox), force-fill the stage.
+    if (svgEl.getAttribute('viewBox')) {
+      svgEl.removeAttribute('width')
+      svgEl.removeAttribute('height')
+    } else {
+      svgEl.setAttribute('width', '100%')
+      svgEl.setAttribute('height', '100%')
+    }
+  }
 
   const paths = Array.from(doc.querySelectorAll('path'))
   const nodeDots: SVGCircleElement[] = []

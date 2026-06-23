@@ -20,7 +20,7 @@ function useViewedSvgUrl(svg: string | null, opts: VectorViewOptions): string | 
     if (!svg) return null
     let out: string
     try {
-      out = applyView(svg, opts)
+      out = applyView(svg, opts, true)
     } catch {
       out = svg
     }

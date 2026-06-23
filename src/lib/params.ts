@@ -39,7 +39,7 @@ export const DEFAULT_PARAMS: TraceParams = {
   cornerThreshold: 60,
   lengthThreshold: 4,
   spliceThreshold: 45,
-  pathPrecision: 8,
+  pathPrecision: 2, // VTracer's own default; 2 decimals is visually lossless
   maxIterations: 10,
 }
 
@@ -125,6 +125,27 @@ export const PRESETS: Preset[] = [
       colorMode: 'color',
       mode: 'pixel',
       filterSpeckle: 0,
+    },
+  },
+  {
+    // Tuned for text/glyphs: binary trace (no anti-alias halos), polygon curves
+    // (sharp serif tips, no rounded corners), low speckle + low corner threshold
+    // to keep hairline strokes and serif notches. Pair with the "Text" threshold
+    // preprocessing for best results. See params below for the rationale values.
+    name: 'Text',
+    description: 'Crisp text & glyphs — binary, sharp corners, fine detail',
+    params: {
+      colorMode: 'binary',
+      hierarchical: 'cutout',
+      mode: 'polygon',
+      filterSpeckle: 2, // keep ~1px strokes (upscale small inputs to compensate)
+      colorPrecision: 1,
+      layerDifference: 16,
+      cornerThreshold: 30, // catch serif notches & diagonal junctions
+      lengthThreshold: 3.5, // preserve fine letterform detail
+      spliceThreshold: 45,
+      pathPrecision: 2, // 2 decimals is plenty; far smaller files
+      maxIterations: 10,
     },
   },
 ]

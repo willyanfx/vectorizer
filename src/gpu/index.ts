@@ -72,4 +72,4 @@ export async function preprocess(file: Blob, opts: PreprocessOptions): Promise<P
 
 export { decodeImage, preprocessCanvas } from './cpu-fallback'
 export { DEFAULT_PREPROCESS } from './cpu-fallback'
-export type { PreprocessOptions } from './cpu-fallback'
+export type { PreprocessOptions, ThresholdMode } from './cpu-fallback'

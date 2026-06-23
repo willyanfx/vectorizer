@@ -6,7 +6,7 @@ import {
   type Hierarchical,
   type TraceParams,
 } from '../lib/params'
-import type { PreprocessOptions } from '../gpu'
+import type { PreprocessOptions, ThresholdMode } from '../gpu'
 import styles from './ParamsPanel.module.css'
 
 interface Props {
@@ -81,7 +81,15 @@ export function ParamsPanel({
               className={styles.preset}
               title={preset.description}
               disabled={disabled}
-              onClick={() => onParams({ ...params, ...preset.params })}
+              onClick={() => {
+                onParams({ ...params, ...preset.params })
+                // The Text preset pairs with text-tuned preprocessing: upscale
+                // small inputs (preserve hairlines) + adaptive threshold (crisp
+                // 1-bit, no anti-alias halos), and no blur.
+                if (preset.name === 'Text') {
+                  onPreprocess({ ...preprocess, minSize: 1500, threshold: 'sauvola', blur: 0 })
+                }
+              }}
             >
               {preset.name}
             </button>
@@ -218,23 +226,49 @@ export function ParamsPanel({
           disabled={disabled}
         />
         <Slider
-          label="Blur radius"
-          value={preprocess.blur}
+          label="Upscale small to (px, 0 = off)"
+          value={preprocess.minSize}
           min={0}
-          max={10}
-          step={0.5}
-          onChange={(v) => setPre('blur', v)}
+          max={3000}
+          step={250}
+          onChange={(v) => setPre('minSize', v)}
           disabled={disabled}
         />
-        <Slider
-          label="Quantize colors (0 = off)"
-          value={preprocess.quantizeColors}
-          min={0}
-          max={64}
-          step={2}
-          onChange={(v) => setPre('quantizeColors', v)}
-          disabled={disabled}
-        />
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Threshold (text)</span>
+          <select
+            value={preprocess.threshold}
+            disabled={disabled}
+            onChange={(e) => setPre('threshold', e.target.value as ThresholdMode)}
+          >
+            <option value="off">Off</option>
+            <option value="sauvola">Adaptive (Sauvola)</option>
+          </select>
+        </label>
+        {/* Blur & quantize don't apply once an adaptive threshold binarizes the
+            image, so hide them when thresholding is on. */}
+        {preprocess.threshold === 'off' && (
+          <>
+            <Slider
+              label="Blur radius"
+              value={preprocess.blur}
+              min={0}
+              max={10}
+              step={0.5}
+              onChange={(v) => setPre('blur', v)}
+              disabled={disabled}
+            />
+            <Slider
+              label="Quantize colors (0 = off)"
+              value={preprocess.quantizeColors}
+              min={0}
+              max={64}
+              step={2}
+              onChange={(v) => setPre('quantizeColors', v)}
+              disabled={disabled}
+            />
+          </>
+        )}
       </section>
 
       <button
