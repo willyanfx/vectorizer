@@ -39,6 +39,11 @@
   font-weight: 600;
 }
 
+.saved {
+  color: #2ecc71;
+  font-weight: 700;
+}
+
 .actions {
   display: flex;
   gap: 8px;

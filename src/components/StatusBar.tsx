@@ -1,11 +1,15 @@
-import { useState } from 'react'
-import { optimizeSvg } from '../lib/svgo-browser'
 import type { TraceState } from '../hooks/useTracer'
+import type { OptimizeState } from '../hooks/useOptimize'
 import styles from './StatusBar.module.css'
 
 interface Props {
   state: TraceState
+  optimize: OptimizeState
   fileName: string | null
+  /** SVG to export (already has view/layer visibility applied by the parent). */
+  exportSvg: string | null
+  /** Optimized + view-applied SVG to export. */
+  exportOptimizedSvg: string | null
 }
 
 function download(content: string, filename: string) {
@@ -23,21 +27,8 @@ function bytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(2)} MB`
 }
 
-export function StatusBar({ state, fileName }: Props) {
-  const [optimizing, setOptimizing] = useState(false)
+export function StatusBar({ state, optimize, fileName, exportSvg, exportOptimizedSvg }: Props) {
   const baseName = fileName?.replace(/\.[^.]+$/, '') || 'vector'
-  const svgSize = state.svg ? new Blob([state.svg]).size : 0
-
-  const handleOptimized = async () => {
-    if (!state.svg) return
-    setOptimizing(true)
-    try {
-      const optimized = await optimizeSvg(state.svg)
-      download(optimized, `${baseName}.min.svg`)
-    } finally {
-      setOptimizing(false)
-    }
-  }
 
   return (
     <div className={styles.bar}>
@@ -60,7 +51,14 @@ export function StatusBar({ state, fileName }: Props) {
                 {state.backend === 'webgpu' ? 'GPU' : 'CPU'} prep {Math.round(state.preprocessMs)}ms
               </span>
             )}
-            <span className={styles.stat}>{bytes(svgSize)}</span>
+            {optimize.optimizedSize > 0 && (
+              <span className={styles.stat}>
+                {bytes(optimize.optimizedSize)}
+                {optimize.savedPct > 0 && (
+                  <span className={styles.saved}> −{optimize.savedPct.toFixed(0)}%</span>
+                )}
+              </span>
+            )}
           </>
         )}
 
@@ -73,18 +71,18 @@ export function StatusBar({ state, fileName }: Props) {
 
       <div className={styles.actions}>
         <button
-          className={styles.button}
-          disabled={!state.svg}
-          onClick={() => state.svg && download(state.svg, `${baseName}.svg`)}
+          className={`${styles.button} ${styles.secondary}`}
+          disabled={!exportSvg}
+          onClick={() => exportSvg && download(exportSvg, `${baseName}.svg`)}
         >
           Download SVG
         </button>
         <button
-          className={`${styles.button} ${styles.secondary}`}
-          disabled={!state.svg || optimizing}
-          onClick={handleOptimized}
+          className={styles.button}
+          disabled={!exportOptimizedSvg || optimize.optimizing}
+          onClick={() => exportOptimizedSvg && download(exportOptimizedSvg, `${baseName}.min.svg`)}
         >
-          {optimizing ? 'Optimizing…' : 'Download optimized'}
+          {optimize.optimizing ? 'Optimizing…' : 'Download optimized'}
         </button>
       </div>
     </div>

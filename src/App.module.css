@@ -64,6 +64,16 @@
   padding: 18px;
   overflow-y: auto;
   background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+  width: 100%;
 }
 
 .preview {

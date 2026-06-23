@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { applyView, type BackgroundMode, type VectorViewOptions } from '../lib/vectorView'
 import styles from './PreviewPane.module.css'
 
 type View = 'original' | 'svg' | 'split'
@@ -7,25 +8,42 @@ interface Props {
   originalUrl: string | null
   svg: string | null
   busy: boolean
+  viewOptions: VectorViewOptions
+  background: BackgroundMode
+  customBg: string
 }
 
-function useSvgUrl(svg: string | null): string | null {
+// The SVG is inlined (not <img>) so render/visibility toggles can manipulate its
+// paths. We apply the view options to the SVG string and inject the result.
+function useViewedSvgUrl(svg: string | null, opts: VectorViewOptions): string | null {
   return useMemo(() => {
     if (!svg) return null
-    return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
-  }, [svg])
+    let out: string
+    try {
+      out = applyView(svg, opts)
+    } catch {
+      out = svg
+    }
+    return URL.createObjectURL(new Blob([out], { type: 'image/svg+xml' }))
+  }, [svg, opts])
 }
 
-export function PreviewPane({ originalUrl, svg, busy }: Props) {
+export function PreviewPane({
+  originalUrl,
+  svg,
+  busy,
+  viewOptions,
+  background,
+  customBg,
+}: Props) {
   const [view, setView] = useState<View>('split')
-  const [split, setSplit] = useState(0.5) // 0..1 divider position
+  const [split, setSplit] = useState(0.5)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const svgUrl = useSvgUrl(svg)
+  const svgUrl = useViewedSvgUrl(svg, viewOptions)
   const stageRef = useRef<HTMLDivElement>(null)
   const dragging = useRef<{ x: number; y: number } | null>(null)
 
-  // revoke the object URL when it changes/unmounts
   useEffect(() => {
     return () => {
       if (svgUrl) URL.revokeObjectURL(svgUrl)
@@ -43,7 +61,7 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
   }, [])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (view === 'split') return // split divider handles its own drag
+    if (view === 'split') return
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     dragging.current = { x: e.clientX - pan.x, y: e.clientY - pan.y }
   }
@@ -55,7 +73,6 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
     dragging.current = null
   }
 
-  // split divider drag
   const onSplitDrag = (e: React.PointerEvent) => {
     e.stopPropagation()
     const stage = stageRef.current
@@ -75,6 +92,17 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
 
   const transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
   const hasResult = !!svgUrl
+
+  // background style for the stage
+  const stageBg: React.CSSProperties =
+    background === 'white'
+      ? { background: '#ffffff' }
+      : background === 'black'
+        ? { background: '#000000' }
+        : background === 'custom'
+          ? { background: customBg }
+          : {}
+  const stageClass = `${styles.stage} ${background === 'checker' ? styles.checker : ''}`
 
   return (
     <div className={styles.wrap}>
@@ -109,7 +137,8 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
 
       <div
         ref={stageRef}
-        className={`${styles.stage} ${styles.checker}`}
+        className={stageClass}
+        style={stageBg}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -117,11 +146,8 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
       >
         {busy && <div className={styles.spinner} aria-label="Processing" />}
 
-        {!originalUrl && !hasResult && (
-          <p className={styles.empty}>Upload an image to begin</p>
-        )}
+        {!originalUrl && !hasResult && <p className={styles.empty}>Upload an image to begin</p>}
 
-        {/* Original */}
         {(view === 'original' || view === 'split') && originalUrl && (
           <div
             className={styles.layer}
@@ -135,7 +161,6 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
           </div>
         )}
 
-        {/* Vector */}
         {(view === 'svg' || view === 'split') && svgUrl && (
           <div
             className={styles.layer}
@@ -149,7 +174,6 @@ export function PreviewPane({ originalUrl, svg, busy }: Props) {
           </div>
         )}
 
-        {/* Split divider */}
         {view === 'split' && originalUrl && hasResult && (
           <div
             className={styles.divider}
