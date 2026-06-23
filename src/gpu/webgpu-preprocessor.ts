@@ -8,14 +8,19 @@
 // converted back to u8 RGBA on readback.
 
 import type { PixelData } from '../lib/params'
-import type { PreprocessOptions } from './cpu-fallback'
+import { sauvolaThreshold, type PreprocessOptions } from './cpu-fallback'
 import gaussianWgsl from './shaders/gaussian.wgsl?raw'
 import quantizeWgsl from './shaders/quantize.wgsl?raw'
 
-function targetSize(w: number, h: number, maxSize: number): [number, number] {
-  const longest = Math.max(w, h)
-  if (longest <= maxSize) return [w, h]
-  const s = maxSize / longest
+// Apply the size floor (upscale small text) then the ceiling (clamp large), to
+// match the Canvas path in cpu-fallback.ts.
+function targetSize(w: number, h: number, maxSize: number, minSize = 0): [number, number] {
+  let longest = Math.max(w, h)
+  let s = 1
+  if (minSize > 0 && longest < minSize) s = minSize / longest
+  longest *= s
+  if (longest > maxSize) s *= maxSize / longest
+  if (s === 1) return [w, h]
   return [Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))]
 }
 
@@ -48,7 +53,7 @@ export class WebGPUPreprocessor {
 
   /** Resize via canvas, then blur + quantize via compute. Returns RGBA pixels. */
   async process(src: ImageBitmap, opts: PreprocessOptions): Promise<PixelData> {
-    const [w, h] = targetSize(src.width, src.height, opts.maxSize)
+    const [w, h] = targetSize(src.width, src.height, opts.maxSize, opts.minSize)
 
     // Resize on a canvas, get u8 RGBA.
     const canvas = new OffscreenCanvas(w, h)
@@ -56,11 +61,18 @@ export class WebGPUPreprocessor {
     ctx.imageSmoothingEnabled = true
     ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(src, 0, 0, w, h)
-    const u8 = ctx.getImageData(0, 0, w, h).data
+    const imageData = ctx.getImageData(0, 0, w, h)
+    const u8 = imageData.data
 
-    const needsBlur = opts.blur >= 1
-    const needsQuantize = opts.quantizeColors >= 2
+    // Adaptive threshold (text) is a CPU finalizing step run on the readback so
+    // both backends produce identical output. Blur is intentionally skipped for
+    // text — it softens ink edges before binarization. Threshold supersedes
+    // quantize (you wouldn't color-reduce a 1-bit image).
+    const thresholding = opts.threshold === 'sauvola'
+    const needsBlur = opts.blur >= 1 && !thresholding
+    const needsQuantize = opts.quantizeColors >= 2 && !thresholding
     if (!needsBlur && !needsQuantize) {
+      if (thresholding) sauvolaThreshold(imageData)
       return { pixels: new Uint8Array(u8.buffer.slice(0)), width: w, height: h }
     }
 

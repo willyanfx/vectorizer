@@ -36,6 +36,23 @@ async function initEngine() {
 // Map our VTracer config onto imagetracerjs options as best we can. The two
 // engines are not equivalent; this just keeps the fallback reasonable.
 function imageTracerOptions(config: VTracerConfig) {
+  // Binary + sharp corners + fine speckle is our "Text" profile. When it's
+  // active, tune imagetracerjs for glyphs: keep every short stroke segment
+  // (pathomit 0), fit lines/curves precisely (low ltres/qtres), no blur.
+  const textProfile = config.binary && config.mode === 'polygon' && config.filterSpeckle <= 2
+  if (textProfile) {
+    return {
+      numberofcolors: 2,
+      pathomit: 0, // thin strokes are short paths — never discard
+      ltres: 0.5, // precise straight-line fitting
+      qtres: 0.5, // precise quadratic-spline fitting
+      roundcoords: Math.max(0, Math.min(config.pathPrecision, 8)),
+      rightangleenhance: true, // sharpen right-angle corners
+      linefilter: true,
+      blurradius: 0,
+      colorquantcycles: 1,
+    }
+  }
   return {
     // imagetracerjs uses a fixed palette size; approximate from colorPrecision.
     numberofcolors: config.binary ? 2 : Math.max(2, 2 ** Math.min(config.colorPrecision, 6)),
