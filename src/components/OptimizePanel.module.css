@@ -23,7 +23,7 @@
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--bg);
 }
 

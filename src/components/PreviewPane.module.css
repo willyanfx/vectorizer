@@ -18,20 +18,29 @@
 .tabs {
   display: inline-flex;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-md); /* 8 = inner 6 + 2px padding (concentric) */
   padding: 2px;
   gap: 2px;
+  box-shadow: var(--shadow-border);
 }
 
 .tab {
-  padding: 6px 14px;
+  padding: 7px 14px;
   font-size: 0.82rem;
+  font-weight: 500;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
+  transition-property: background, color;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+.tab:hover:not(:disabled):not(.active) {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .tab:disabled {
@@ -51,21 +60,56 @@
 }
 
 .zoomControls button {
+  position: relative;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
   font-size: 1rem;
   line-height: 1;
+  box-shadow: var(--shadow-border);
+  transition-property: background, box-shadow, scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+/* The visible control is 28px but the touch/click target is 40px. The pseudo
+   element is exactly 40px wide and the controls sit 6px apart, so neighbouring
+   hit areas meet without overlapping. */
+.zoomControls button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+}
+
+.zoomControls button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: var(--shadow-border-hover);
+}
+
+.zoomControls button:active {
+  scale: 0.96;
 }
 
 .zoomControls .fit {
   width: auto;
   padding: 0 10px;
   font-size: 0.78rem;
+}
+
+/* The Reset pill is wider than 40px already; keep its hit area to its own box
+   so it cannot overlap the adjacent + button. */
+.zoomControls .fit::after {
+  width: 100%;
+  height: 40px;
 }
 
 .zoomLabel {
@@ -117,6 +161,10 @@
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
+  /* A hairline edge so light artwork doesn't dissolve into a light stage.
+     outline (not border) keeps it outside the box and off the layout. */
+  outline: 1px solid var(--image-outline);
+  outline-offset: -1px;
 }
 
 .divider {
@@ -134,15 +182,22 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
   background: var(--accent);
   color: #fff;
   display: grid;
   place-items: center;
   font-size: 0.8rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-pop);
+  transition-property: scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+.divider:hover .handle {
+  scale: 1.1;
 }
 
 .empty {

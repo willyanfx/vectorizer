@@ -3,28 +3,37 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 40px 24px;
+  gap: 10px;
+  padding: 44px 24px;
+  /* A dashed border is the affordance here -- it reads as "drop target", so it
+     stays a border rather than becoming a shadow. */
   border: 2px dashed var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   color: var(--text-dim);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition-property: border-color, background, color, scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
   text-align: center;
 }
 
-.zone:hover,
-.zone:focus-visible {
+.zone:hover {
   border-color: var(--accent);
   color: var(--text);
-  outline: none;
+  background: var(--accent-soft);
+}
+
+.zone:active {
+  scale: 0.99;
 }
 
 .dragging {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
+  /* A touch of lift so the zone clearly becomes the active drop target. */
+  scale: 1.01;
 }
 
 .disabled {
@@ -34,6 +43,18 @@
 
 .icon {
   color: var(--accent);
+  transition-property: scale, translate;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+.zone:hover .icon {
+  translate: 0 -2px;
+}
+
+.dragging .icon {
+  scale: 1.1;
+  translate: 0 -2px;
 }
 
 .title {
@@ -41,6 +62,7 @@
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text);
+  text-wrap: balance;
 }
 
 .hint {

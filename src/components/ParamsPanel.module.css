@@ -39,19 +39,33 @@
 }
 
 .preset {
-  padding: 8px 10px;
+  padding: 9px 10px;
   font-size: 0.82rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  box-shadow: var(--shadow-border);
+  transition-property: box-shadow, background, color, scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
 }
 
 .preset:hover:not(:disabled) {
-  border-color: var(--accent);
   background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: var(--shadow-border-hover);
+}
+
+.preset:active:not(:disabled) {
+  scale: 0.96;
+}
+
+.preset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .field {
@@ -76,31 +90,128 @@
 }
 
 .field select {
-  padding: 7px 9px;
+  padding: 8px 9px;
+  /* Inputs keep a real border -- it is the affordance that says "editable",
+     and it stays legible for users who rely on high-contrast modes. */
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
   color: var(--text);
   font-size: 0.85rem;
+  cursor: pointer;
+  transition-property: border-color, background;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
 }
 
+.field select:hover {
+  border-color: var(--text-dim);
+}
+
+/* --- Range slider -------------------------------------------------------
+   The native control is replaced so the track and thumb match the rest of the
+   UI. The input keeps a 40px tall hit area (WCAG-ish) while the visible track
+   stays 4px, by making the element tall and centring the track inside it. */
 .field input[type='range'] {
   width: 100%;
-  accent-color: var(--accent);
+  height: 40px;
+  margin: -12px 0; /* absorb the oversized hit area so rows stay compact */
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.field input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+}
+
+.field input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+}
+
+.field input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px; /* centre the 14px thumb on the 4px track */
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition-property: scale, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease);
+}
+
+.field input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition-property: scale, box-shadow;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease);
+}
+
+.field input[type='range']:hover::-webkit-slider-thumb {
+  scale: 1.15;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.field input[type='range']:hover::-moz-range-thumb {
+  scale: 1.15;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.field input[type='range']:active::-webkit-slider-thumb {
+  scale: 1.05;
+  box-shadow: 0 0 0 6px var(--accent-soft);
+}
+
+.field input[type='range']:active::-moz-range-thumb {
+  scale: 1.05;
+  box-shadow: 0 0 0 6px var(--accent-soft);
+}
+
+.field input[type='range']:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .reset {
   margin-top: 4px;
-  padding: 9px;
+  padding: 10px;
   font-size: 0.82rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
+  box-shadow: var(--shadow-border);
+  transition-property: box-shadow, color, background, scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
 }
 
 .reset:hover:not(:disabled) {
   color: var(--text);
-  border-color: var(--text-dim);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-border-hover);
+}
+
+.reset:active:not(:disabled) {
+  scale: 0.96;
+}
+
+.reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

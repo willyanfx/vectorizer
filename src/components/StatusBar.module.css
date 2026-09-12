@@ -20,8 +20,8 @@
 .stat {
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
   background: var(--bg);
 }
 
@@ -40,7 +40,7 @@
 }
 
 .saved {
-  color: #2ecc71;
+  color: var(--success);
   font-weight: 700;
 }
 
@@ -50,14 +50,25 @@
 }
 
 .button {
-  padding: 8px 14px;
+  padding: 9px 15px;
   font-size: 0.82rem;
   font-weight: 600;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--accent);
   color: #fff;
   cursor: pointer;
+  transition-property: background, box-shadow, scale, opacity;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button:active:not(:disabled) {
+  scale: 0.96;
 }
 
 .button:disabled {
@@ -66,7 +77,13 @@
 }
 
 .secondary {
-  background: var(--surface);
+  background: var(--surface-raised);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: none;
+  box-shadow: var(--shadow-border);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-border-hover);
 }
