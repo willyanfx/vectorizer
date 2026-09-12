@@ -17,8 +17,17 @@ function download(content: string, filename: string) {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  // The anchor must be in the document for the click to reliably start a
+  // download in Firefox, and the url must outlive the click: revoking it
+  // synchronously races the download in Safari/Firefox and can yield an empty
+  // file. Defer the revoke (and the removal) to the next macrotask.
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => {
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, 0)
 }
 
 function bytes(n: number): string {

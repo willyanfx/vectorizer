@@ -24,8 +24,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 18px;
+  /* Divider stays a border (layout separation, not elevation). */
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+  /* Keeps the header reading as the top plane when the preview scrolls. */
+  z-index: 1;
 }
 
 .brand {
@@ -37,6 +40,9 @@
 .logo {
   color: var(--accent);
   font-size: 1.2rem;
+  /* The glyph's ink sits slightly high in its em box; nudge it onto the
+     baseline of the wordmark next to it. */
+  transform: translateY(1px);
 }
 
 .brand h1 {
@@ -44,6 +50,7 @@
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 .tagline {
@@ -58,17 +65,27 @@
 }
 
 .newBtn {
-  padding: 7px 14px;
+  padding: 8px 14px;
   font-size: 0.82rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
+  box-shadow: var(--shadow-border);
+  transition-property: box-shadow, background, scale;
+  transition-duration: var(--dur);
+  transition-timing-function: var(--ease);
 }
 
 .newBtn:hover {
-  border-color: var(--accent);
+  box-shadow: var(--shadow-border-hover);
+  background: var(--accent-soft);
+}
+
+.newBtn:active {
+  scale: 0.96;
 }
 
 .main {
@@ -82,10 +99,13 @@
   border-right: 1px solid var(--border);
   padding: 18px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
 .divider {
