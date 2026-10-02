@@ -50,7 +50,7 @@ export function parsePath(d: string): Subpath[] {
   while (i < tokens.length) {
     let cmd = tokens[i]
     if (/[a-zA-Z]/.test(cmd)) i++
-    else if (lastCmd) cmd = lastCmd === 'M' ? 'L' : lastCmd === 'm' ? 'l' : lastCmd // implicit repeat
+    else if (lastCmd && lastCmd.toLowerCase() !== 'z') cmd = lastCmd === 'M' ? 'L' : lastCmd === 'm' ? 'l' : lastCmd // implicit repeat
     else break
 
     const lower = cmd.toLowerCase()

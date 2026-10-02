@@ -48,13 +48,13 @@ export interface AiProgress {
 }
 
 function kebab(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'layer'
-  )
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  // used as an XML id, which must start with a letter
+  return /^[a-z]/.test(slug) ? slug : `layer-${slug}`.replace(/-$/, '')
 }
 
 async function annotatedImage(file: Blob, objects: TracedObject[], svgW: number, svgH: number): Promise<{ data: string; sx: number; sy: number }> {
@@ -169,7 +169,7 @@ export async function nameLayers(
   if (!text) throw new Error('Empty response from Claude.')
   const parsed = JSON.parse(text) as { groups: Array<{ name: string; objects: number[] }> }
 
-  return layoutFromAnswer(svg, background, objects, parsed)
+  return layoutFromAnswer(svg, background, objects, parsed, new Set(labelled.map((o) => o.id)))
 }
 
 /**
@@ -182,11 +182,12 @@ export function layoutFromAnswer(
   background: TracedPath[],
   objects: TracedObject[],
   answer: { groups: Array<{ name: string; objects: number[] }> },
+  /** Ids Claude was actually shown; claims on any other id are ignored. */
+  labelled: Set<number> = new Set(objects.map((o) => o.id)),
 ): NamedLayout {
-  const byId = new Map(objects.map((o) => [o.id, o]))
   const owner = new Map<number, number>() // object id → group index
   const groups = answer.groups.map((g, gi) => {
-    for (const id of g.objects) if (byId.has(id) && !owner.has(id)) owner.set(id, gi)
+    for (const id of g.objects) if (labelled.has(id) && !owner.has(id)) owner.set(id, gi)
     return { name: kebab(g.name), objects: [] as TracedObject[] }
   })
   const claimed = objects.filter((o) => owner.has(o.id))

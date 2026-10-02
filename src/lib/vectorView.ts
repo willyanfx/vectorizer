@@ -4,6 +4,8 @@
 // VTracer emits a flat list of <path fill="#RRGGBB" transform="..."> elements,
 // one per color region. We group by fill color into "layers".
 
+import { parsePath, type Point } from './svgPath'
+
 export type RenderStyle = 'fill' | 'outline' | 'nodes'
 export type BackgroundMode = 'checker' | 'white' | 'black' | 'custom'
 
@@ -46,51 +48,9 @@ export function parseSvg(svg: string): ParsedSvg {
   return { doc, svgEl, layers }
 }
 
-// Extract anchor points (absolute) from a path `d` for the "nodes" view. This is
-// a lightweight pass over M/L/C/S/Q/T command coordinates — enough to dot the
-// curve anchors without a full SVG path math library.
-function anchorPoints(d: string): Array<[number, number]> {
-  const pts: Array<[number, number]> = []
-  // commands followed by number runs; we read absolute coords for uppercase cmds
-  const tokens = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)
-  if (!tokens) return pts
-  let i = 0
-  let cur: [number, number] = [0, 0]
-  const num = () => parseFloat(tokens[i++])
-  while (i < tokens.length) {
-    const cmd = tokens[i++]
-    switch (cmd) {
-      case 'M':
-      case 'L':
-      case 'T': {
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'C': {
-        num(); num(); num(); num() // two control points
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'S':
-      case 'Q': {
-        num(); num()
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'Z':
-      case 'z':
-        break
-      // relative / other commands: skip their numbers conservatively
-      default:
-        // consume any stray numbers belonging to unsupported commands
-        while (i < tokens.length && !/[a-zA-Z]/.test(tokens[i])) i++
-        break
-    }
-  }
-  return pts
+// Anchor points (absolute, before the path's own transform) for the "nodes" view.
+function anchorPoints(d: string): Point[] {
+  return parsePath(d).flatMap((s) => [s.start, ...s.segments.map((seg) => seg.p)])
 }
 
 /**

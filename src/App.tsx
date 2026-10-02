@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DropZone } from './components/DropZone'
 import { ParamsPanel } from './components/ParamsPanel'
 import { OptimizePanel } from './components/OptimizePanel'
@@ -62,7 +62,10 @@ export default function App() {
     return () => URL.revokeObjectURL(url)
   }, [file])
 
+  // bumped on every new image so a late AI response for the old one is dropped
+  const aiRequest = useRef(0)
   const loadFile = useCallback((f: File | null) => {
+    aiRequest.current++
     setFile(f)
     setAiLayout(null)
     setAiStatus('idle')
@@ -166,14 +169,17 @@ export default function App() {
     async (apiKey: string) => {
       if (!state.svg || !file) return
       const svg = state.svg
+      const id = ++aiRequest.current
       setAiError(null)
       setAiStatus('preparing')
       try {
         const { nameLayers } = await import('./lib/aiNaming')
-        const layout = await nameLayers(svg, file, apiKey, (p) => setAiStatus(p.stage))
+        const layout = await nameLayers(svg, file, apiKey, (p) => id === aiRequest.current && setAiStatus(p.stage))
+        if (id !== aiRequest.current) return
         setAiLayout(layout)
         setAiStatus('idle')
       } catch (err) {
+        if (id !== aiRequest.current) return
         setAiError(err instanceof Error ? err.message : String(err))
         setAiStatus('error')
       }

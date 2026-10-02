@@ -11,6 +11,9 @@ import { bbox, overlaps, parsePath, parseTransform, transformSubpaths, union, ty
 import { ensureViewBox, normalizeColor } from './vectorView'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+// Boxes closer than this (canvas px) count as overlapping: shapes that merely
+// touch still share anti-aliased seam pixels, whose blend depends on order.
+const TOUCH = 1
 const parser = new DOMParser()
 const serializer = new XMLSerializer()
 
@@ -79,8 +82,8 @@ export function readPaths(doc: Document): TracedPath[] {
 
 function hits(group: PathGroup, box: BBox | null): boolean {
   if (!box || !group.box) return true // unmeasurable ⇒ assume it overlaps
-  if (!overlaps(group.box, box)) return false
-  return group.paths.some((p) => !p.box || overlaps(p.box, box))
+  if (!overlaps(group.box, box, TOUCH)) return false
+  return group.paths.some((p) => !p.box || overlaps(p.box, box, TOUCH))
 }
 
 /**
@@ -147,13 +150,14 @@ export function findObjects(
     .sort((a, b) => a[0].box!.minX - b[0].box!.minX)
   for (let a = 0; a < order.length; a++) {
     const [pa, ia] = order[a]
-    for (let b = a + 1; b < order.length && order[b][0].box!.minX < pa.box!.maxX; b++) {
+    for (let b = a + 1; b < order.length && order[b][0].box!.minX - TOUCH < pa.box!.maxX; b++) {
       const [pb, ib] = order[b]
-      if (overlaps(pa.box!, pb.box!)) parent[find(ib)] = find(ia)
+      if (overlaps(pa.box!, pb.box!, TOUCH)) parent[find(ib)] = find(ia)
     }
   }
-  // paths we couldn't measure might overlap anything: fold them all into one object
-  for (const i of unmeasured.slice(1)) parent[find(i)] = find(unmeasured[0])
+  // a path we couldn't measure might overlap anything, so nothing may be
+  // reordered around it: everything becomes one object
+  if (unmeasured.length) for (let i = 1; i < rest.length; i++) parent[find(i)] = find(0)
 
   const clusters = new Map<number, TracedPath[]>()
   rest.forEach((p, i) => {
