@@ -5,6 +5,8 @@ import { OptimizePanel } from './components/OptimizePanel'
 import { VectorToggles } from './components/VectorToggles'
 import { PreviewPane } from './components/PreviewPane'
 import { StatusBar } from './components/StatusBar'
+import { LayersPanel, type AiStatus } from './components/LayersPanel'
+import { Landing } from './components/Landing'
 import { useTracer } from './hooks/useTracer'
 import { useDebounce } from './hooks/useDebounce'
 import { useOptimize } from './hooks/useOptimize'
@@ -17,6 +19,8 @@ import {
   type RenderStyle,
   type VectorViewOptions,
 } from './lib/vectorView'
+import { buildExportSvg, type LayerMode, type NamedLayout } from './lib/layers'
+import { detectBackgroundColor, matchBackgroundLayer } from './lib/background'
 import { DEFAULT_PREPROCESS, type PreprocessOptions } from './gpu'
 import styles from './App.module.css'
 
@@ -32,6 +36,14 @@ export default function App() {
   const [background, setBackground] = useState<BackgroundMode>('checker')
   const [customBg, setCustomBg] = useState('#888888')
   const [hiddenColors, setHiddenColors] = useState<Set<string>>(new Set())
+
+  // background + export layer state
+  const [detectedBg, setDetectedBg] = useState<{ file: File; color: string | null } | null>(null)
+  const [keepBackground, setKeepBackground] = useState(true)
+  const [layerMode, setLayerMode] = useState<LayerMode>('color')
+  const [aiLayout, setAiLayout] = useState<NamedLayout | null>(null)
+  const [aiStatus, setAiStatus] = useState<AiStatus>('idle')
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const { state, runTrace } = useTracer()
 
@@ -49,6 +61,26 @@ export default function App() {
     setOriginalUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [file])
+
+  const loadFile = useCallback((f: File | null) => {
+    setFile(f)
+    setAiLayout(null)
+    setAiStatus('idle')
+    setAiError(null)
+  }, [])
+
+  // detect the background color once per image (independent of trace settings)
+  useEffect(() => {
+    if (!file) return
+    let cancelled = false
+    detectBackgroundColor(file)
+      .then((color) => !cancelled && setDetectedBg({ file, color }))
+      .catch(() => !cancelled && setDetectedBg({ file, color: null }))
+    return () => {
+      cancelled = true
+    }
+  }, [file])
+  const backgroundColor = detectedBg?.file === file ? detectedBg.color : null
 
   // re-trace when file or settings change
   useEffect(() => {
@@ -71,39 +103,87 @@ export default function App() {
     }
   }, [state.svg])
 
-  const viewOptions: VectorViewOptions = useMemo(
-    () => ({ render, hiddenColors }),
-    [render, hiddenColors],
+  // traced layer matching the detected background color
+  const backgroundLayer = useMemo(
+    () => matchBackgroundLayer(layers, backgroundColor),
+    [layers, backgroundColor],
   )
 
-  // The SVG actually exported: layer visibility applied, but always FILL render
-  // (outline/nodes are inspection-only views, not export styles).
+  // what's actually hidden: user-hidden layers, plus the background when removed
+  const effectiveHidden = useMemo(() => {
+    if (keepBackground || !backgroundLayer) return hiddenColors
+    return new Set([...hiddenColors, backgroundLayer])
+  }, [hiddenColors, keepBackground, backgroundLayer])
+
+  const viewOptions: VectorViewOptions = useMemo(
+    () => ({ render, hiddenColors: effectiveHidden }),
+    [render, effectiveHidden],
+  )
+
+  // AI names belong to the exact trace they were computed for
+  const currentAiLayout = aiLayout && aiLayout.svg === state.svg ? aiLayout : null
+
+  // The SVG actually exported: hidden layers removed, grouped into named layers,
+  // always FILL render (outline/nodes are inspection-only views).
   const exportSvg = useMemo(() => {
     if (!state.svg) return null
-    if (hiddenColors.size === 0) return state.svg
     try {
-      return applyView(state.svg, { render: 'fill', hiddenColors })
-    } catch {
-      return state.svg
+      return buildExportSvg(state.svg, {
+        hiddenColors: effectiveHidden,
+        mode: layerMode,
+        backgroundColor: backgroundLayer,
+        named: currentAiLayout,
+      })
+    } catch (err) {
+      console.warn('Layer export failed, using flat SVG:', err)
+      return effectiveHidden.size ? applyView(state.svg, { render: 'fill', hiddenColors: effectiveHidden }) : state.svg
     }
-  }, [state.svg, hiddenColors])
+  }, [state.svg, effectiveHidden, layerMode, backgroundLayer, currentAiLayout])
 
   // Live optimization runs on the export SVG (so it reflects layer visibility).
   const optimize = useOptimize(exportSvg, debouncedOptimize)
 
   const toggleColor = useCallback((color: string) => {
+    // the removed background is controlled by its own toggle
+    if (color === backgroundLayer && !keepBackground) {
+      setKeepBackground(true)
+      return
+    }
     setHiddenColors((prev) => {
       const next = new Set(prev)
       if (next.has(color)) next.delete(color)
       else next.add(color)
       return next
     })
-  }, [])
+  }, [backgroundLayer, keepBackground])
   const showAll = useCallback(() => setHiddenColors(new Set()), [])
   const hideAll = useCallback(
     () => setHiddenColors(new Set(layers.map((l) => l.color))),
     [layers],
   )
+
+  const runAi = useCallback(
+    async (apiKey: string) => {
+      if (!state.svg || !file) return
+      const svg = state.svg
+      setAiError(null)
+      setAiStatus('preparing')
+      try {
+        const { nameLayers } = await import('./lib/aiNaming')
+        const layout = await nameLayers(svg, file, apiKey, (p) => setAiStatus(p.stage))
+        setAiLayout(layout)
+        setAiStatus('idle')
+      } catch (err) {
+        setAiError(err instanceof Error ? err.message : String(err))
+        setAiStatus('error')
+      }
+    },
+    [state.svg, file],
+  )
+  const clearAi = useCallback(() => {
+    setAiLayout(null)
+    setAiStatus('idle')
+  }, [])
 
   const busy = state.status === 'preprocessing' || state.status === 'tracing'
   const hasImage = !!file
@@ -125,7 +205,7 @@ export default function App() {
         </div>
         <div className={styles.headerActions}>
           {hasImage && (
-            <button className={styles.newBtn} onClick={() => setFile(null)}>
+            <button className={styles.newBtn} onClick={() => loadFile(null)}>
               New image
             </button>
           )}
@@ -135,62 +215,83 @@ export default function App() {
       <main className={styles.main}>
         <aside className={styles.sidebar}>
           {!hasImage ? (
-            <DropZone onFile={setFile} />
+            <DropZone onFile={loadFile} />
           ) : (
             <>
-              <ParamsPanel
-                params={params}
-                onParams={setParams}
-                preprocess={preprocess}
-                onPreprocess={setPreprocess}
-                backend={state.backend}
-                disabled={!hasImage}
-              />
-              <hr className={styles.divider} />
-              <VectorToggles
-                render={render}
-                onRender={setRender}
-                background={background}
-                onBackground={setBackground}
-                customBg={customBg}
-                onCustomBg={setCustomBg}
-                layers={layers}
-                hiddenColors={hiddenColors}
-                onToggleColor={toggleColor}
-                onShowAll={showAll}
-                onHideAll={hideAll}
-                disabled={!hasResult}
-              />
-              <hr className={styles.divider} />
-              <OptimizePanel
-                options={optimizeOpts}
-                onOptions={setOptimizeOpts}
-                rawSize={optimize.rawSize}
-                optimizedSize={optimize.optimizedSize}
-                savedPct={optimize.savedPct}
-                optimizing={optimize.optimizing}
-                disabled={!hasResult}
-              />
+                  <ParamsPanel
+                    params={params}
+                    onParams={setParams}
+                    preprocess={preprocess}
+                    onPreprocess={setPreprocess}
+                    backend={state.backend}
+                    disabled={!hasImage}
+                  />
+                  <hr className={styles.divider} />
+                  <VectorToggles
+                    render={render}
+                    onRender={setRender}
+                    background={background}
+                    onBackground={setBackground}
+                    customBg={customBg}
+                    onCustomBg={setCustomBg}
+                    layers={layers}
+                    hiddenColors={effectiveHidden}
+                    onToggleColor={toggleColor}
+                    onShowAll={showAll}
+                    onHideAll={hideAll}
+                    backgroundLayer={backgroundLayer}
+                    keepBackground={keepBackground}
+                    onKeepBackground={setKeepBackground}
+                    disabled={!hasResult}
+                  />
+                  <hr className={styles.divider} />
+                  <LayersPanel
+                    mode={layerMode}
+                    onMode={setLayerMode}
+                    aiStatus={aiStatus}
+                    aiError={aiError}
+                    aiLayout={currentAiLayout}
+                    aiStale={!!aiLayout && !currentAiLayout}
+                    onRunAi={runAi}
+                    onClearAi={clearAi}
+                    disabled={!hasResult || busy}
+                  />
+                  <hr className={styles.divider} />
+                  <OptimizePanel
+                    options={optimizeOpts}
+                    onOptions={setOptimizeOpts}
+                    rawSize={optimize.rawSize}
+                    optimizedSize={optimize.optimizedSize}
+                    savedPct={optimize.savedPct}
+                    optimizing={optimize.optimizing}
+                    disabled={!hasResult}
+                  />
             </>
           )}
         </aside>
 
         <section className={styles.preview}>
-          <PreviewPane
-            originalUrl={originalUrl}
-            svg={state.svg}
-            busy={busy}
-            viewOptions={viewOptions}
-            background={background}
-            customBg={customBg}
-          />
-          <StatusBar
-            state={state}
-            optimize={optimize}
-            fileName={file?.name ?? null}
-            exportSvg={exportSvg}
-            exportOptimizedSvg={optimize.optimized}
-          />
+          {!hasImage ? (
+            <Landing />
+          ) : (
+            <>
+              <PreviewPane
+                originalUrl={originalUrl}
+                svg={state.svg}
+                busy={busy}
+                viewOptions={viewOptions}
+                background={background}
+                customBg={customBg}
+              />
+              <StatusBar
+                state={state}
+                optimize={optimize}
+                fileName={file?.name ?? null}
+                exportSvg={exportSvg}
+                exportOptimizedSvg={optimize.optimized}
+              />
+            </>
+          )}
         </section>
       </main>
     </div>

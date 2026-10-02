@@ -1,0 +1,142 @@
+.wrap {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.inner {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.hero h2 {
+  margin: 0 0 12px;
+  font-size: 1.8rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.hero p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.hero .cta {
+  margin-top: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.steps,
+.features {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps {
+  grid-template-columns: repeat(3, 1fr);
+  counter-reset: step;
+}
+
+.features {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+
+.steps li,
+.features li {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.steps li {
+  counter-increment: step;
+}
+
+.steps li h3::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.steps h3,
+.features h3 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.steps p,
+.features p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.faq {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.faq details + details {
+  border-top: 1px solid var(--border);
+}
+
+.faq summary {
+  padding: 13px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.faq p {
+  margin: 0;
+  padding: 0 16px 14px;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+@media (max-width: 720px) {
+  .inner {
+    padding: 24px 16px 40px;
+    gap: 32px;
+  }
+  .hero h2 {
+    font-size: 1.4rem;
+  }
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}

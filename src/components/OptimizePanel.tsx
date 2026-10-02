@@ -127,7 +127,7 @@ export function OptimizePanel({
           disabled={childrenDisabled}
         />
         <Toggle
-          label="Clean up IDs"
+          label="Strip layer names"
           checked={options.cleanupIds}
           onChange={(v) => set('cleanupIds', v)}
           disabled={childrenDisabled}

@@ -1,5 +1,6 @@
 import type { TraceState } from '../hooks/useTracer'
 import type { OptimizeState } from '../hooks/useOptimize'
+import { svgToLottie } from '../lib/lottie'
 import styles from './StatusBar.module.css'
 
 interface Props {
@@ -12,8 +13,8 @@ interface Props {
   exportOptimizedSvg: string | null
 }
 
-function download(content: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'image/svg+xml' }))
+function download(content: string, filename: string, type = 'image/svg+xml') {
+  const url = URL.createObjectURL(new Blob([content], { type }))
   const a = document.createElement('a')
   a.href = url
   a.download = filename
@@ -70,6 +71,17 @@ export function StatusBar({ state, optimize, fileName, exportSvg, exportOptimize
       </div>
 
       <div className={styles.actions}>
+        <button
+          className={`${styles.button} ${styles.secondary}`}
+          disabled={!exportSvg}
+          title="Lottie JSON with one shape layer per SVG layer"
+          onClick={() =>
+            exportSvg &&
+            download(JSON.stringify(svgToLottie(exportSvg, baseName)), `${baseName}.json`, 'application/json')
+          }
+        >
+          Download Lottie
+        </button>
         <button
           className={`${styles.button} ${styles.secondary}`}
           disabled={!exportSvg}

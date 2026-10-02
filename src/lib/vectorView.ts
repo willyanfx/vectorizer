@@ -26,7 +26,7 @@ export interface ParsedSvg {
 const parser = new DOMParser()
 const serializer = new XMLSerializer()
 
-function normalizeColor(c: string | null): string {
+export function normalizeColor(c: string | null): string {
   if (!c) return '#000000'
   return c.trim().toUpperCase()
 }
@@ -94,6 +94,20 @@ function anchorPoints(d: string): Array<[number, number]> {
 }
 
 /**
+ * Guarantee a viewBox: VTracer emits width/height but no viewBox, which leaves
+ * the SVG unscalable. Derive "0 0 W H" from the pixel dimensions when absent.
+ */
+export function ensureViewBox(svgEl: Element) {
+  if (svgEl.getAttribute('viewBox')) return
+  // parseFloat reads the leading number, tolerating unit suffixes like "800px".
+  const wNum = parseFloat(svgEl.getAttribute('width') ?? '')
+  const hNum = parseFloat(svgEl.getAttribute('height') ?? '')
+  if (wNum > 0 && hNum > 0) {
+    svgEl.setAttribute('viewBox', `0 0 ${wNum} ${hNum}`)
+  }
+}
+
+/**
  * Re-render the SVG string with view options applied. Returns a new SVG string
  * suitable for inlining. Does NOT mutate the input.
  *
@@ -111,16 +125,7 @@ export function applyView(svg: string, opts: VectorViewOptions, forDisplay = fal
   const { doc, svgEl } = parseSvg(svg)
   if (!svgEl) return svg
 
-  // Guarantee a viewBox: VTracer emits width/height but no viewBox, which leaves
-  // the SVG unscalable. Derive "0 0 W H" from the pixel dimensions when absent.
-  if (!svgEl.getAttribute('viewBox')) {
-    // parseFloat reads the leading number, tolerating unit suffixes like "800px".
-    const wNum = parseFloat(svgEl.getAttribute('width') ?? '')
-    const hNum = parseFloat(svgEl.getAttribute('height') ?? '')
-    if (wNum > 0 && hNum > 0) {
-      svgEl.setAttribute('viewBox', `0 0 ${wNum} ${hNum}`)
-    }
-  }
+  ensureViewBox(svgEl)
 
   if (forDisplay) {
     // Drop fixed dimensions so the <img> sizes from the viewBox aspect ratio.
