@@ -41,50 +41,64 @@ export function useTracer() {
   const pendingRef = useRef<{ file: Blob; params: TraceParams; pre: PreprocessOptions } | null>(null)
   const [state, setState] = useState<TraceState>(INITIAL)
 
-  // Create the worker once.
+  // Create the worker once; replace it if the WASM inside it crashes.
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/tracer.worker.ts', import.meta.url), {
-      type: 'module',
-    })
-    workerRef.current = worker
+    let disposed = false
 
-    worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      const msg = e.data
-      switch (msg.type) {
-        case 'ready':
-          readyRef.current = true
-          setState((s) => ({ ...s, engine: msg.engine }))
-          // flush a request that arrived before init finished
-          if (pendingRef.current) {
-            const p = pendingRef.current
-            pendingRef.current = null
-            void runTrace(p.file, p.params, p.pre)
-          }
-          break
-        case 'fallback':
-          setState((s) => ({ ...s, usedFallback: true, fallbackReason: msg.reason }))
-          break
-        case 'result':
-          if (msg.id !== reqId.current) return // stale
-          setState((s) => ({
-            ...s,
-            status: 'done',
-            svg: msg.svg,
-            traceMs: msg.durationMs,
-            engine: msg.engine,
-            error: null,
-          }))
-          break
-        case 'error':
-          if (msg.id !== reqId.current) return
-          setState((s) => ({ ...s, status: 'error', error: msg.message }))
-          break
+    const spawn = () => {
+      const worker = new Worker(new URL('../workers/tracer.worker.ts', import.meta.url), {
+        type: 'module',
+      })
+      workerRef.current = worker
+      readyRef.current = false
+
+      worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+        const msg = e.data
+        switch (msg.type) {
+          case 'ready':
+            readyRef.current = true
+            setState((s) => ({ ...s, engine: msg.engine }))
+            // flush a request that arrived before init finished
+            if (pendingRef.current) {
+              const p = pendingRef.current
+              pendingRef.current = null
+              void runTrace(p.file, p.params, p.pre)
+            }
+            break
+          case 'fallback':
+            setState((s) => ({ ...s, usedFallback: true, fallbackReason: msg.reason }))
+            break
+          case 'result':
+            if (msg.id !== reqId.current) return // stale
+            setState((s) => ({
+              ...s,
+              status: 'done',
+              svg: msg.svg,
+              traceMs: msg.durationMs,
+              engine: msg.engine,
+              error: null,
+            }))
+            break
+          case 'error':
+            if (msg.fatal) {
+              // A Rust panic left the WASM instance unusable; start a fresh one
+              // so the next trace isn't poisoned by this one.
+              worker.terminate()
+              if (!disposed) spawn()
+            }
+            if (msg.id !== reqId.current) return
+            setState((s) => ({ ...s, status: 'error', error: msg.message }))
+            break
+        }
       }
+
+      worker.postMessage({ type: 'init' } satisfies WorkerRequest)
     }
 
-    worker.postMessage({ type: 'init' } satisfies WorkerRequest)
+    spawn()
     return () => {
-      worker.terminate()
+      disposed = true
+      workerRef.current?.terminate()
       workerRef.current = null
       readyRef.current = false
     }

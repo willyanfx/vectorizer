@@ -7,6 +7,12 @@
 // rely on the default — we import the real binary via Vite's `?url` and pass it
 // explicitly to init(). If init throws for any reason, we fall back to the pure
 // JS imagetracerjs so the app still produces an SVG everywhere.
+//
+// A Rust panic inside to_svg surfaces as a WebAssembly trap ("unreachable").
+// After a trap the instance's heap/allocator state can't be trusted, and the
+// wasm-bindgen glue caches the instance so it can't be re-initialized in
+// place — so we report the error as `fatal` and the main thread replaces this
+// worker with a fresh one (see useTracer).
 
 import init, { to_svg } from 'vtracer-wasm'
 import wasmUrl from 'vtracer-wasm/vtracer.wasm?url'
@@ -39,7 +45,11 @@ function imageTracerOptions(config: VTracerConfig) {
   // Binary + sharp corners + fine speckle is our "Text" profile. When it's
   // active, tune imagetracerjs for glyphs: keep every short stroke segment
   // (pathomit 0), fit lines/curves precisely (low ltres/qtres), no blur.
-  const textProfile = config.binary && config.mode === 'polygon' && config.filterSpeckle <= 2
+  // (config is in vtracer's raw units: filterSpeckle is an area, colorPrecision
+  // is bits dropped — see toVTracerConfig.)
+  const speckle = Math.round(Math.sqrt(config.filterSpeckle))
+  const bitsKept = 8 - config.colorPrecision
+  const textProfile = config.binary && config.mode === 'polygon' && speckle <= 2
   if (textProfile) {
     return {
       numberofcolors: 2,
@@ -55,8 +65,8 @@ function imageTracerOptions(config: VTracerConfig) {
   }
   return {
     // imagetracerjs uses a fixed palette size; approximate from colorPrecision.
-    numberofcolors: config.binary ? 2 : Math.max(2, 2 ** Math.min(config.colorPrecision, 6)),
-    pathomit: config.filterSpeckle, // drop short paths ~ filter speckle
+    numberofcolors: config.binary ? 2 : Math.max(2, 2 ** Math.min(bitsKept, 6)),
+    pathomit: speckle, // drop short paths ~ filter speckle
     ltres: config.mode === 'polygon' ? 100 : 1, // high ltres ≈ straight lines
     qtres: 1,
     roundcoords: Math.max(0, Math.min(config.pathPrecision, 8)),
@@ -92,7 +102,13 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       }
       post({ type: 'result', id, svg, durationMs: performance.now() - t0, engine })
     } catch (err) {
-      post({ type: 'error', id, message: err instanceof Error ? err.message : String(err) })
+      const message = err instanceof Error ? err.message : String(err)
+      if (engine === 'vtracer' && err instanceof WebAssembly.RuntimeError) {
+        engine = null // refuse further work; this instance is poisoned
+        post({ type: 'error', id, message: `VTracer crashed (${message}); restarting tracer`, fatal: true })
+      } else {
+        post({ type: 'error', id, message })
+      }
     }
   }
 }
