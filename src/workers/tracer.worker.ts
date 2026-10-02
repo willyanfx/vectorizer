@@ -19,7 +19,7 @@ import wasmUrl from 'vtracer-wasm/vtracer.wasm?url'
 // imagetracerjs is UMD (`module.exports = new ImageTracer()`); Vite interops it
 // as a default import. `imagedataToSVG({data,width,height}, options)` is sync.
 import ImageTracer from 'imagetracerjs'
-import type { WorkerRequest, WorkerResponse, VTracerConfig, TraceEngine } from '../lib/params'
+import { toVTracerConfig, type WorkerRequest, type WorkerResponse, type TraceEngine, type TraceParams } from '../lib/params'
 
 let engine: TraceEngine | null = null
 
@@ -39,24 +39,21 @@ async function initEngine() {
   }
 }
 
-// Map our VTracer config onto imagetracerjs options as best we can. The two
+// Map our UI params onto imagetracerjs options as best we can. The two
 // engines are not equivalent; this just keeps the fallback reasonable.
-function imageTracerOptions(config: VTracerConfig) {
+function imageTracerOptions(p: TraceParams) {
+  const binary = p.colorMode === 'binary'
   // Binary + sharp corners + fine speckle is our "Text" profile. When it's
   // active, tune imagetracerjs for glyphs: keep every short stroke segment
   // (pathomit 0), fit lines/curves precisely (low ltres/qtres), no blur.
-  // (config is in vtracer's raw units: filterSpeckle is an area, colorPrecision
-  // is bits dropped — see toVTracerConfig.)
-  const speckle = Math.round(Math.sqrt(config.filterSpeckle))
-  const bitsKept = 8 - config.colorPrecision
-  const textProfile = config.binary && config.mode === 'polygon' && speckle <= 2
+  const textProfile = binary && p.mode === 'polygon' && p.filterSpeckle <= 2
   if (textProfile) {
     return {
       numberofcolors: 2,
       pathomit: 0, // thin strokes are short paths — never discard
       ltres: 0.5, // precise straight-line fitting
       qtres: 0.5, // precise quadratic-spline fitting
-      roundcoords: Math.max(0, Math.min(config.pathPrecision, 8)),
+      roundcoords: Math.max(0, Math.min(p.pathPrecision, 8)),
       rightangleenhance: true, // sharpen right-angle corners
       linefilter: true,
       blurradius: 0,
@@ -65,20 +62,20 @@ function imageTracerOptions(config: VTracerConfig) {
   }
   return {
     // imagetracerjs uses a fixed palette size; approximate from colorPrecision.
-    numberofcolors: config.binary ? 2 : Math.max(2, 2 ** Math.min(bitsKept, 6)),
-    pathomit: speckle, // drop short paths ~ filter speckle
-    ltres: config.mode === 'polygon' ? 100 : 1, // high ltres ≈ straight lines
+    numberofcolors: binary ? 2 : Math.max(2, 2 ** Math.min(p.colorPrecision, 6)),
+    pathomit: p.filterSpeckle, // drop short paths ~ filter speckle
+    ltres: p.mode === 'polygon' ? 100 : 1, // high ltres ≈ straight lines
     qtres: 1,
-    roundcoords: Math.max(0, Math.min(config.pathPrecision, 8)),
+    roundcoords: Math.max(0, Math.min(p.pathPrecision, 8)),
     linefilter: true,
     colorquantcycles: 3,
   }
 }
 
-function traceWithImageTracer(pixels: Uint8Array, width: number, height: number, config: VTracerConfig): string {
+function traceWithImageTracer(pixels: Uint8Array, width: number, height: number, params: TraceParams): string {
   // imagetracerjs expects a Uint8ClampedArray-backed ImageData-like object.
   const imgd = { data: new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.length), width, height }
-  return ImageTracer.imagedataToSVG(imgd, imageTracerOptions(config))
+  return ImageTracer.imagedataToSVG(imgd, imageTracerOptions(params))
 }
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
@@ -89,14 +86,14 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   }
 
   if (msg.type === 'trace') {
-    const { id, pixels, width, height, config } = msg
+    const { id, pixels, width, height, params } = msg
     const t0 = performance.now()
     try {
       let svg: string
       if (engine === 'vtracer') {
-        svg = to_svg(pixels, width, height, config)
+        svg = to_svg(pixels, width, height, toVTracerConfig(params))
       } else if (engine === 'imagetracer') {
-        svg = traceWithImageTracer(pixels, width, height, config)
+        svg = traceWithImageTracer(pixels, width, height, params)
       } else {
         throw new Error('Tracer not initialized')
       }

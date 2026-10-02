@@ -83,7 +83,8 @@ export function toVTracerConfig(p: TraceParams): VTracerConfig {
     maxIterations: p.maxIterations,
     spliceThreshold: deg2rad(p.spliceThreshold),
     filterSpeckle: p.filterSpeckle * p.filterSpeckle,
-    colorPrecision: 8 - clamp(Math.round(p.colorPrecision), 1, 8),
+    // NaN would slip through clamp and make serde panic, so fall back first.
+    colorPrecision: 8 - clamp(Math.round(p.colorPrecision) || DEFAULT_PARAMS.colorPrecision, 1, 8),
     layerDifference: p.layerDifference,
     pathPrecision: p.pathPrecision,
   }
@@ -184,7 +185,7 @@ export type WorkerRequest =
       pixels: Uint8Array
       width: number
       height: number
-      config: VTracerConfig
+      params: TraceParams // worker converts per engine (toVTracerConfig for VTracer)
     }
 
 export type WorkerResponse =
