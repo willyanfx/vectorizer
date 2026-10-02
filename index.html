@@ -67,44 +67,71 @@
               "Color and black-and-white tracing",
               "Adjustable tracing parameters",
               "SVGO optimization to shrink SVG file size",
+              "Layered SVG export grouped by color",
+              "Automatic background detection and removal",
+              "Lottie JSON export",
               "Free with no sign-up or watermark"
             ]
           },
           {
             "@type": "FAQPage",
             "mainEntity": [
-              {
-                "@type": "Question",
-                "name": "How do I convert an image to SVG for free?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "Drag and drop a PNG, JPG, WebP, GIF or BMP image onto Vector. It traces the image into a scalable SVG vector right in your browser and lets you download the result for free — no sign-up, no watermark, no upload to a server."
+                {
+                  "@type": "Question",
+                  "name": "How do I convert an image to SVG for free?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Drop a PNG, JPG, WebP, GIF or BMP image onto Vector. It traces the image into a scalable SVG right in your browser, and you can download the result as SVG or Lottie. There is no sign-up, no watermark and no limit."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Are my images uploaded to a server?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "No. Tracing runs entirely in your browser using WebAssembly and, when available, WebGPU. The one exception is the optional AI layer naming: it only runs when you click it, and it sends a downscaled copy of the image to Anthropic using your own API key."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Is there a limit on how many images I can convert?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "No. Because conversion happens on your own device, there are no credits, quotas or daily limits."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Which formats are supported?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "You can upload PNG, JPG/JPEG, WebP, GIF and BMP images. You can download SVG, optimized SVG, or Lottie JSON."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Will the SVG have layers I can edit?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. Paths are grouped into layers by color, and the background gets its own layer, so the file opens with a tidy layer list in Figma, Illustrator or Inkscape. Optional AI naming can group shapes into layers like \"logo-icon\" or \"text-heading\"."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Can I remove the background?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. Vector detects the background color from the image border. Untick \"Keep background color\" and that layer is left out of the preview and every download."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Can I animate the result?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Yes. Download it as Lottie JSON: each layer becomes a Lottie shape layer, ready to animate in a Lottie editor or play with any Lottie player."
+                  }
                 }
-              },
-              {
-                "@type": "Question",
-                "name": "Are my images uploaded to a server?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "No. Vector runs entirely client-side using WebAssembly and (when available) WebGPU. Your images are processed on your own device and never leave your browser."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "Which image formats can I convert to SVG?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "You can convert PNG, JPG/JPEG, WebP, GIF and BMP raster images into SVG vectors."
-                }
-              },
-              {
-                "@type": "Question",
-                "name": "Is the SVG output editable and scalable?",
-                "acceptedAnswer": {
-                  "@type": "Answer",
-                  "text": "Yes. The output is a standard SVG made of vector paths, so it scales to any size without losing quality and can be edited in tools like Figma, Illustrator or Inkscape."
-                }
-              }
             ]
           }
         ]
@@ -120,6 +147,11 @@
           Vector converts PNG, JPG, WebP, GIF and BMP images into clean, scalable
           SVG vectors entirely in your browser. Please enable JavaScript to use the
           converter. Your images are processed on your device and are never uploaded.
+        </p>
+        <p>
+          Free and unlimited: no sign-up, no credits and no watermark. Download a
+          layered SVG, an optimized SVG or a Lottie JSON file, and remove the
+          background with one toggle.
         </p>
       </noscript>
     </div>
