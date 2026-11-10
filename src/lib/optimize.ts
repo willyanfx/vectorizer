@@ -10,7 +10,7 @@ export interface OptimizeOptions {
   precision: number // decimal places for path/number data (0..8)
   removeComments: boolean
   removeMetadata: boolean
-  cleanupIds: boolean
+  cleanupIds: boolean // strips the layer-name ids on export groups
   collapseGroups: boolean
   mergePaths: boolean
   convertPathData: boolean
@@ -23,7 +23,7 @@ export const DEFAULT_OPTIMIZE: OptimizeOptions = {
   precision: 3,
   removeComments: true,
   removeMetadata: true,
-  cleanupIds: true,
+  cleanupIds: false, // the only ids in our SVGs are layer names; keep them
   collapseGroups: true,
   mergePaths: true,
   convertPathData: true,

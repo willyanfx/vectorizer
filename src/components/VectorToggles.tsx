@@ -13,6 +13,10 @@ interface Props {
   onToggleColor: (color: string) => void
   onShowAll: () => void
   onHideAll: () => void
+  /** Traced layer detected as the image background, if any. */
+  backgroundLayer: string | null
+  keepBackground: boolean
+  onKeepBackground: (keep: boolean) => void
   disabled?: boolean
 }
 
@@ -41,6 +45,9 @@ export function VectorToggles({
   onToggleColor,
   onShowAll,
   onHideAll,
+  backgroundLayer,
+  keepBackground,
+  onKeepBackground,
   disabled,
 }: Props) {
   return (
@@ -88,6 +95,17 @@ export function VectorToggles({
         )}
       </div>
 
+      <label className={styles.toggle}>
+        <input
+          type="checkbox"
+          checked={keepBackground || !backgroundLayer}
+          disabled={disabled || !backgroundLayer}
+          onChange={(e) => onKeepBackground(e.target.checked)}
+        />
+        <span>Keep background color</span>
+        <span className={styles.hint}>{backgroundLayer ? backgroundLayer : 'none detected'}</span>
+      </label>
+
       {layers.length > 0 && (
         <div className={styles.group}>
           <div className={styles.layersHead}>
@@ -104,6 +122,7 @@ export function VectorToggles({
           <div className={styles.layers}>
             {layers.map((layer) => {
               const visible = !hiddenColors.has(layer.color)
+              const isBg = layer.color === backgroundLayer
               return (
                 <button
                   key={layer.color}
@@ -114,6 +133,7 @@ export function VectorToggles({
                 >
                   <span className={styles.swatch} style={{ background: layer.color }} />
                   <span className={styles.hex}>{layer.color}</span>
+                  {isBg && <span className={styles.badge}>BG</span>}
                   <span className={styles.count}>{layer.count}</span>
                   <span className={styles.eye}>{visible ? '👁' : '—'}</span>
                 </button>

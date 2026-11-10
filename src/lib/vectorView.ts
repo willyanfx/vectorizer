@@ -4,6 +4,8 @@
 // VTracer emits a flat list of <path fill="#RRGGBB" transform="..."> elements,
 // one per color region. We group by fill color into "layers".
 
+import { parsePath, type Point } from './svgPath'
+
 export type RenderStyle = 'fill' | 'outline' | 'nodes'
 export type BackgroundMode = 'checker' | 'white' | 'black' | 'custom'
 
@@ -26,7 +28,7 @@ export interface ParsedSvg {
 const parser = new DOMParser()
 const serializer = new XMLSerializer()
 
-function normalizeColor(c: string | null): string {
+export function normalizeColor(c: string | null): string {
   if (!c) return '#000000'
   return c.trim().toUpperCase()
 }
@@ -46,51 +48,23 @@ export function parseSvg(svg: string): ParsedSvg {
   return { doc, svgEl, layers }
 }
 
-// Extract anchor points (absolute) from a path `d` for the "nodes" view. This is
-// a lightweight pass over M/L/C/S/Q/T command coordinates — enough to dot the
-// curve anchors without a full SVG path math library.
-function anchorPoints(d: string): Array<[number, number]> {
-  const pts: Array<[number, number]> = []
-  // commands followed by number runs; we read absolute coords for uppercase cmds
-  const tokens = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e-?\d+)?/g)
-  if (!tokens) return pts
-  let i = 0
-  let cur: [number, number] = [0, 0]
-  const num = () => parseFloat(tokens[i++])
-  while (i < tokens.length) {
-    const cmd = tokens[i++]
-    switch (cmd) {
-      case 'M':
-      case 'L':
-      case 'T': {
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'C': {
-        num(); num(); num(); num() // two control points
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'S':
-      case 'Q': {
-        num(); num()
-        cur = [num(), num()]
-        pts.push(cur)
-        break
-      }
-      case 'Z':
-      case 'z':
-        break
-      // relative / other commands: skip their numbers conservatively
-      default:
-        // consume any stray numbers belonging to unsupported commands
-        while (i < tokens.length && !/[a-zA-Z]/.test(tokens[i])) i++
-        break
-    }
+// Anchor points (absolute, before the path's own transform) for the "nodes" view.
+function anchorPoints(d: string): Point[] {
+  return parsePath(d).flatMap((s) => [s.start, ...s.segments.map((seg) => seg.p)])
+}
+
+/**
+ * Guarantee a viewBox: VTracer emits width/height but no viewBox, which leaves
+ * the SVG unscalable. Derive "0 0 W H" from the pixel dimensions when absent.
+ */
+export function ensureViewBox(svgEl: Element) {
+  if (svgEl.getAttribute('viewBox')) return
+  // parseFloat reads the leading number, tolerating unit suffixes like "800px".
+  const wNum = parseFloat(svgEl.getAttribute('width') ?? '')
+  const hNum = parseFloat(svgEl.getAttribute('height') ?? '')
+  if (wNum > 0 && hNum > 0) {
+    svgEl.setAttribute('viewBox', `0 0 ${wNum} ${hNum}`)
   }
-  return pts
 }
 
 /**
@@ -111,16 +85,7 @@ export function applyView(svg: string, opts: VectorViewOptions, forDisplay = fal
   const { doc, svgEl } = parseSvg(svg)
   if (!svgEl) return svg
 
-  // Guarantee a viewBox: VTracer emits width/height but no viewBox, which leaves
-  // the SVG unscalable. Derive "0 0 W H" from the pixel dimensions when absent.
-  if (!svgEl.getAttribute('viewBox')) {
-    // parseFloat reads the leading number, tolerating unit suffixes like "800px".
-    const wNum = parseFloat(svgEl.getAttribute('width') ?? '')
-    const hNum = parseFloat(svgEl.getAttribute('height') ?? '')
-    if (wNum > 0 && hNum > 0) {
-      svgEl.setAttribute('viewBox', `0 0 ${wNum} ${hNum}`)
-    }
-  }
+  ensureViewBox(svgEl)
 
   if (forDisplay) {
     // Drop fixed dimensions so the <img> sizes from the viewBox aspect ratio.

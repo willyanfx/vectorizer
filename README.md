@@ -16,7 +16,17 @@ Everything runs in the browser — **your images never leave your device.**
   works everywhere (including iOS Safari).
 - **Preview:** side-by-side / split / overlay views with smooth, crisp,
   resolution-independent zoom & pan.
-- **Export:** download the SVG, or an SVGO-optimized version.
+- **Layers:** paths are grouped into `<g id="color-RRGGBB">` layers (named
+  `background` for the detected background) without changing paint order, so
+  the file opens with a clean layer list in Figma / Illustrator / Inkscape.
+- **Background removal:** the background color is detected from the image
+  border; untick "Keep background color" to drop it from preview and exports.
+- **Export:** download the SVG, an SVGO-optimized version, or Lottie JSON (one
+  shape layer per SVG layer).
+- **AI layer names (optional, opt-in):** groups shapes into named layers like
+  `logo-icon` / `text-heading` using Claude. This is the only feature that sends
+  anything off-device: a downscaled copy of the image goes to the Anthropic API
+  with the user's own API key, straight from the browser.
 
 ## Develop
 

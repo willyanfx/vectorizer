@@ -9,6 +9,15 @@
 //   binary: bool, mode, hierarchical, cornerThreshold, lengthThreshold,
 //   maxIterations, spliceThreshold, filterSpeckle, colorPrecision,
 //   layerDifference, pathPrecision
+//
+// ALSO IMPORTANT: that WASM passes these values straight into visioncortex
+// with NONE of the unit conversions upstream vtracer does in its CLI/web demo
+// (vtracer cmdapp config.rs / webapp main.js). So we do them here:
+//   colorPrecision  -> 8 - bits   (visioncortex wants bits DROPPED per channel;
+//                                  must be < 8 or runner.rs asserts & panics)
+//   filterSpeckle   -> px * px    (visioncortex wants an AREA)
+//   corner/splice   -> radians    (UI is degrees)
+// Skipping these made color mode keep ~2 bits/channel and blend everything.
 
 export type ColorMode = 'color' | 'binary'
 export type Hierarchical = 'stacked' | 'cutout'
@@ -43,32 +52,39 @@ export const DEFAULT_PARAMS: TraceParams = {
   maxIterations: 10,
 }
 
-/** The exact object shape the WASM expects (camelCase, every field present). */
+/**
+ * The exact object shape the WASM expects (camelCase, every field present).
+ * Values are in visioncortex's raw units, NOT the UI's — see header comment.
+ */
 export interface VTracerConfig {
   binary: boolean
   mode: CurveMode
   hierarchical: Hierarchical
-  cornerThreshold: number
+  cornerThreshold: number // radians
   lengthThreshold: number
   maxIterations: number
-  spliceThreshold: number
-  filterSpeckle: number
-  colorPrecision: number
+  spliceThreshold: number // radians
+  filterSpeckle: number // area in px²
+  colorPrecision: number // bits dropped per channel, [0, 7]
   layerDifference: number
   pathPrecision: number
 }
+
+const deg2rad = (deg: number) => (deg * Math.PI) / 180
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 export function toVTracerConfig(p: TraceParams): VTracerConfig {
   return {
     binary: p.colorMode === 'binary',
     mode: p.mode,
     hierarchical: p.hierarchical,
-    cornerThreshold: p.cornerThreshold,
+    cornerThreshold: deg2rad(p.cornerThreshold),
     lengthThreshold: p.lengthThreshold,
     maxIterations: p.maxIterations,
-    spliceThreshold: p.spliceThreshold,
-    filterSpeckle: p.filterSpeckle,
-    colorPrecision: p.colorPrecision,
+    spliceThreshold: deg2rad(p.spliceThreshold),
+    filterSpeckle: p.filterSpeckle * p.filterSpeckle,
+    // NaN would slip through clamp and make serde panic, so fall back first.
+    colorPrecision: 8 - clamp(Math.round(p.colorPrecision) || DEFAULT_PARAMS.colorPrecision, 1, 8),
     layerDifference: p.layerDifference,
     pathPrecision: p.pathPrecision,
   }
@@ -169,11 +185,12 @@ export type WorkerRequest =
       pixels: Uint8Array
       width: number
       height: number
-      config: VTracerConfig
+      params: TraceParams // worker converts per engine (toVTracerConfig for VTracer)
     }
 
 export type WorkerResponse =
   | { type: 'ready'; engine: TraceEngine }
   | { type: 'fallback'; reason: string }
   | { type: 'result'; id: number; svg: string; durationMs: number; engine: TraceEngine }
-  | { type: 'error'; id: number; message: string }
+  // `fatal`: the WASM trapped (Rust panic) and this worker must be replaced.
+  | { type: 'error'; id: number; message: string; fatal?: boolean }
