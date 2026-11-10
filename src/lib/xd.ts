@@ -670,7 +670,8 @@ function renderArtboard(
   // Children are stored in artboard-local coordinates in the files we've seen,
   // but older files use pasteboard coordinates. Detect the latter by measuring.
   const content = `<g id="content">${body}</g>`
-  const shift = needsPasteboardShift(ctx.defs, content, width, height, ox, oy)
+  const vote = pasteboardVote(children, width, height, ox, oy)
+  const shift = vote !== 0 ? vote > 0 : needsPasteboardShift(ctx.defs, content, width, height, ox, oy)
   const placed = shift ? `<g transform="translate(${fmt(-ox)} ${fmt(-oy)})">${content}</g>` : content
 
   const svg =
@@ -681,6 +682,26 @@ function renderArtboard(
     `<g clip-path="url(#artboard-clip)">${bg}${placed}</g></svg>`
 
   return { id: entry.id, name: entry.name, width, height, svg, skipped: ctx.skipped, imageNeeds: ctx.imageNeeds, layers }
+}
+
+/**
+ * Do the top-level layers sit in pasteboard coordinates? Each layer's origin
+ * votes for the rectangle it falls in: the artboard at its pasteboard
+ * position (+1) or at 0,0 (-1). 0 means undecided. Overall bounds alone can't
+ * tell: one stray layer far off the artboard makes both positions overlap equally.
+ */
+function pasteboardVote(children: Json[], w: number, h: number, ox: number, oy: number): number {
+  if (!ox && !oy) return -1
+  const inside = (x: number, y: number, rx: number, ry: number) =>
+    x >= rx - 1 && x <= rx + w + 1 && y >= ry - 1 && y <= ry + h + 1
+  let score = 0
+  for (const c of children) {
+    const t = c?.transform
+    if (!t || typeof t !== 'object') continue
+    const x = n(t.tx), y = n(t.ty)
+    score += (inside(x, y, ox, oy) ? 1 : 0) - (inside(x, y, 0, 0) ? 1 : 0)
+  }
+  return score
 }
 
 /** True if the content's bbox sits at the artboard's pasteboard position rather than at 0,0. */
