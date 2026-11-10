@@ -213,3 +213,25 @@
 .segment:disabled:not(.segmentOn) {
   opacity: 0.45;
 }
+
+.selection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.check input {
+  accent-color: var(--accent);
+}

@@ -8,7 +8,7 @@ import { StatusBar } from './components/StatusBar'
 import { LayersPanel, type AiStatus } from './components/LayersPanel'
 import { Landing } from './components/Landing'
 import { XdPanel } from './components/XdPanel'
-import { isXdFile, parseXd, setXdImageScale, toDisplaySvg, type XdDocument } from './lib/xd'
+import { composeArtboard, isXdFile, parseXd, setXdImageScale, toDisplaySvg, type XdDocument } from './lib/xd'
 import { useTracer } from './hooks/useTracer'
 import { useDebounce } from './hooks/useDebounce'
 import { useOptimize } from './hooks/useOptimize'
@@ -49,6 +49,8 @@ export default function App() {
   })
 
   const [xdImageBusy, setXdImageBusy] = useState<string | null>(null)
+  const [xdLayerSel, setXdLayerSel] = useState<Set<string>>(new Set())
+  const [xdHidden, setXdHidden] = useState<Map<string, Set<string>>>(new Map())
 
   // background + export layer state
   const [detectedBg, setDetectedBg] = useState<{ file: File; color: string | null } | null>(null)
@@ -84,6 +86,8 @@ export default function App() {
       })
       setXd(doc)
       setXdCurrent(0)
+      setXdLayerSel(new Set())
+      setXdHidden(new Map())
       setXdSelected(new Set(doc.artboards.map((_, i) => i)))
       setXdStatus({ loading: null, error: null })
     } catch (e) {
@@ -132,7 +136,15 @@ export default function App() {
   }, [xd, loadFile])
 
   const xdBoard = xd?.artboards[xdCurrent] ?? null
-  const xdDisplaySvg = useMemo(() => (xdBoard ? toDisplaySvg(xdBoard.svg) : null), [xdBoard])
+  const xdDisplaySvg = useMemo(() => {
+    if (!xd || !xdBoard) return null
+    try {
+      const { svg } = composeArtboard(xd, xdBoard, { hidden: xdHidden.get(xdBoard.id), only: xdLayerSel })
+      return svg ? toDisplaySvg(svg) : null
+    } catch {
+      return toDisplaySvg(xdBoard.svg)
+    }
+  }, [xd, xdBoard, xdHidden, xdLayerSel])
 
   const debouncedParams = useDebounce(params, 300)
   const debouncedPre = useDebounce(preprocess, 300)
@@ -302,12 +314,19 @@ export default function App() {
             <XdPanel
               doc={xd}
               current={xdCurrent}
-              onCurrent={setXdCurrent}
+              onCurrent={(i) => {
+                setXdCurrent(i)
+                setXdLayerSel(new Set())
+              }}
               selected={xdSelected}
               onSelected={setXdSelected}
               onTracePreview={xd.previewUrl ? () => void traceXdPreview() : undefined}
               onImageScale={(s) => void changeXdImageScale(s)}
               imageBusy={xdImageBusy}
+              layerSel={xdLayerSel}
+              onLayerSel={setXdLayerSel}
+              hidden={xdHidden}
+              onHidden={setXdHidden}
             />
           ) : !hasImage ? (
             <>

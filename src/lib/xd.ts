@@ -20,6 +20,15 @@ import { unzip, type Unzipped } from 'fflate'
 /* eslint-disable @typescript-eslint/no-explicit-any -- .agc is untyped JSON */
 type Json = any
 
+/** One entry in an artboard's layer tree (like the Layers panel in XD/Figma). */
+export interface XdLayer {
+  /** Id of the element in the artboard SVG (`<g id={key}>`). */
+  key: string
+  name: string
+  kind: 'group' | 'shape' | 'image' | 'text' | 'component' | 'mask'
+  children: XdLayer[]
+}
+
 export interface XdArtboard {
   id: string
   name: string
@@ -31,6 +40,8 @@ export interface XdArtboard {
   skipped: number
   /** SVG with image placeholders, re-filled when the image scale changes. */
   template: string
+  /** Top-level layers, top-most last (SVG paint order). */
+  layers: XdLayer[]
 }
 
 export interface XdDocument {
@@ -40,6 +51,8 @@ export interface XdDocument {
   previewUrl: string | null
   /** Current image scale (see ParseXdOptions.imageScale). */
   imageScale: number
+  /** Image placeholder key → data URI at the current scale. */
+  imageUris: Map<string, string>
   /** Original file + image sizes, so images can be re-processed at another scale. */
   source: { file: File; imageNeeds: Map<string, { w: number; h: number }> }
 }
@@ -122,6 +135,9 @@ interface Ctx {
   /** Images referenced by this artboard: uid → largest displayed size (px). */
   imageNeeds: Map<string, { w: number; h: number }>
   depth: number
+  layerIds: number
+  /** Children list of the layer currently being rendered. */
+  layerList: XdLayer[]
 }
 
 const uid = (ctx: Ctx, p: string) => `${p}${++ctx.ids}`
@@ -481,7 +497,25 @@ function clipFor(ctx: Ctx, node: Json): string {
   return ` clip-path="url(#${id})"`
 }
 
-function renderNode(ctx: Ctx, node: Json): string {
+function layerKind(node: Json): XdLayer['kind'] {
+  if (node.type === 'syncRef') return 'component'
+  if (node.type === 'text') return 'text'
+  if (node.type === 'shape' || (!node.group && node.shape))
+    return node.style?.fill?.type === 'pattern' ? 'image' : 'shape'
+  if (node.style?.clipPath?.ref || node.meta?.ux?.clipPathResources) return 'mask'
+  return 'group'
+}
+
+function layerName(node: Json, kind: XdLayer['kind']): string {
+  if (kind === 'text') {
+    const t = String(node.text?.rawText ?? node.name ?? '').replace(/\s+/g, ' ').trim()
+    if (t) return t.length > 48 ? `${t.slice(0, 47)}…` : t
+  }
+  if (typeof node.name === 'string' && node.name.trim()) return node.name.trim()
+  return kind[0].toUpperCase() + kind.slice(1)
+}
+
+function renderNode(ctx: Ctx, node: Json, as?: Json): string {
   if (!node || node.visible === false) return ''
   if (ctx.depth > 64) {
     ctx.skipped++
@@ -495,16 +529,32 @@ function renderNode(ctx: Ctx, node: Json): string {
       return ''
     }
     ctx.depth++
-    const out = renderNode(ctx, node.transform ? { ...src, transform: node.transform } : src)
+    // The instance's own layer entry describes the master's node.
+    const out = renderNode(ctx, node.transform ? { ...src, transform: node.transform } : src, as ?? node)
     ctx.depth--
     return out
   }
+
+  const kind = as ? 'component' : layerKind(node)
+  const layer: XdLayer = {
+    key: `xl${++ctx.layerIds}`,
+    name: layerName(as?.name ? as : node, kind === 'component' ? layerKind(node) : kind),
+    kind,
+    children: [],
+  }
+  const parent = ctx.layerList
+  ctx.layerList = layer.children
   ctx.depth++
+  let out: string
   try {
-    return renderNodeInner(ctx, node)
+    out = renderNodeInner(ctx, node)
   } finally {
     ctx.depth--
+    ctx.layerList = parent
   }
+  if (!out.startsWith('<g')) return out
+  parent.push(layer)
+  return `<g id="${layer.key}"${out.slice(2)}`
 }
 
 function renderNodeInner(ctx: Ctx, node: Json): string {
@@ -595,6 +645,8 @@ function renderArtboard(
     symbols,
     imageNeeds: new Map(),
     depth: 0,
+    layerIds: 0,
+    layerList: [],
   }
   const roots: Json[] = agc?.children ?? []
   const abNode = roots.find((c) => c.type === 'artboard')
@@ -608,6 +660,7 @@ function renderArtboard(
 
   const children: Json[] = abNode?.artboard?.children ?? (abNode ? [] : roots)
   const body = children.map((c) => renderNode(ctx, c)).join('')
+  const layers = ctx.layerList
 
   let bg = ''
   const bgc = color(abNode?.style?.fill?.color)
@@ -627,7 +680,7 @@ function renderArtboard(
     `<clipPath id="artboard-clip"><rect width="${fmt(width)}" height="${fmt(height)}"/></clipPath>` +
     `<g clip-path="url(#artboard-clip)">${bg}${placed}</g></svg>`
 
-  return { id: entry.id, name: entry.name, width, height, svg, skipped: ctx.skipped, imageNeeds: ctx.imageNeeds }
+  return { id: entry.id, name: entry.name, width, height, svg, skipped: ctx.skipped, imageNeeds: ctx.imageNeeds, layers }
 }
 
 /** True if the content's bbox sits at the artboard's pasteboard position rather than at 0,0. */
@@ -640,10 +693,7 @@ function needsPasteboardShift(defs: string[], content: string, w: number, h: num
     'image/svg+xml',
   )
   if (parsed.querySelector('parsererror')) return false
-  const host = document.createElement('div')
-  host.style.cssText = 'position:absolute;left:-99999px;top:0;width:0;height:0;overflow:hidden'
-  host.appendChild(document.importNode(parsed.documentElement, true))
-  document.body.appendChild(host)
+  const host = mountForMeasure(parsed.documentElement)
   try {
     const g = host.querySelector('#content') as SVGGraphicsElement | null
     const b = g?.getBBox()
@@ -657,6 +707,24 @@ function needsPasteboardShift(defs: string[], content: string, w: number, h: num
   } finally {
     host.remove()
   }
+}
+
+/**
+ * Mount a copy of an SVG off-screen so it can be measured. Image hrefs are
+ * dropped from the copy: they are placeholders (or huge data URIs) and
+ * <image> boxes come from x/y/width/height anyway.
+ */
+function mountForMeasure(svg: Element): HTMLDivElement {
+  const host = document.createElement('div')
+  host.style.cssText = 'position:absolute;left:-99999px;top:0;overflow:hidden;visibility:hidden'
+  const copy = document.importNode(svg, true)
+  for (const img of copy.querySelectorAll('image')) {
+    img.removeAttribute('href')
+    img.removeAttributeNS('http://www.w3.org/1999/xlink', 'href')
+  }
+  host.appendChild(copy)
+  document.body.appendChild(host)
+  return host
 }
 
 export function isXdFile(file: File): boolean {
@@ -710,6 +778,7 @@ export async function parseXd(file: File, opts: ParseXdOptions = {}): Promise<Xd
     skipped: a.skipped,
     template: a.svg,
     svg: fillImages(a.svg, uris),
+    layers: a.layers,
   }))
 
   const previewKey = Object.keys(files).find((k) => /(^|\/)(preview|thumbnail)\.(png|jpe?g)$/i.test(k))
@@ -725,6 +794,7 @@ export async function parseXd(file: File, opts: ParseXdOptions = {}): Promise<Xd
     artboards,
     previewUrl,
     imageScale,
+    imageUris: uris,
     source: { file, imageNeeds: needs },
   }
 }
@@ -746,6 +816,7 @@ export async function setXdImageScale(
   return {
     ...doc,
     imageScale,
+    imageUris: uris,
     artboards: doc.artboards.map((a) => ({ ...a, svg: fillImages(a.template, uris) })),
   }
 }
@@ -823,4 +894,148 @@ async function imageDataUri(
 /** Display variant: drop fixed size so <img> scales from the viewBox. */
 export function toDisplaySvg(svg: string): string {
   return svg.replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1')
+}
+
+/* --------------------------------------------------------- layer extraction */
+
+export interface ComposeOptions {
+  /** Layer keys to leave out. */
+  hidden?: ReadonlySet<string>
+  /** Export only these layers, cropped to their bounds (artboard background dropped). */
+  only?: ReadonlySet<string>
+}
+
+export interface ComposedSvg {
+  svg: string
+  width: number
+  height: number
+}
+
+/**
+ * Artboard SVG with hidden layers removed, or only the chosen layers, cropped
+ * to their visible bounds. Works on the image-less template, so it stays fast
+ * even when the artboard embeds tens of MB of images. Browser only.
+ */
+export function composeArtboard(doc: XdDocument, board: XdArtboard, opts: ComposeOptions = {}): ComposedSvg {
+  const { hidden, only } = opts
+  const plain = { svg: board.svg, width: board.width, height: board.height }
+  if (!hidden?.size && !only?.size) return plain
+
+  const parsed = new DOMParser().parseFromString(board.template, 'image/svg+xml')
+  const root = parsed.documentElement
+  if (parsed.querySelector('parsererror')) return plain
+  const byKey = (k: string) => root.querySelector(`[id="${CSS.escape(k)}"]`)
+
+  for (const k of hidden ?? []) byKey(k)?.remove()
+
+  let width = board.width
+  let height = board.height
+  if (only?.size) {
+    // Outermost selected elements only (a selected group already contains its children).
+    const picked = [...only]
+      .map(byKey)
+      .filter((el): el is Element => !!el)
+      .filter((el, _, all) => !all.some((o) => o !== el && o.contains(el)))
+    if (!picked.length) return { svg: '', width: 0, height: 0 }
+
+    const keep = new Set(picked)
+    const path = new Set<Element>()
+    for (const el of picked) for (let p = el.parentElement; p; p = p.parentElement) path.add(p)
+    const prune = (el: Element) => {
+      for (const child of [...el.children]) {
+        if (keep.has(child)) continue
+        if (path.has(child)) prune(child)
+        else if (!/^(defs|title|clipPath)$/.test(child.localName)) child.remove()
+      }
+    }
+    prune(root)
+    // Extracted items shouldn't be cut off at the artboard edge.
+    root.querySelector('[clip-path="url(#artboard-clip)"]')?.removeAttribute('clip-path')
+
+    const box = measureLayers(root, picked.map((el) => el.id))
+    if (!box) return { svg: '', width: 0, height: 0 }
+    const [x, y, w, h] = box
+    width = w
+    height = h
+    root.setAttribute('viewBox', `${fmt(x)} ${fmt(y)} ${fmt(w)} ${fmt(h)}`)
+    root.setAttribute('width', fmt(w))
+    root.setAttribute('height', fmt(h))
+  }
+
+  const svg = fillImages(new XMLSerializer().serializeToString(root), doc.imageUris)
+  return { svg, width, height }
+}
+
+/** Union of the elements' visible boxes (clip paths applied, strokes padded), in artboard units. */
+function measureLayers(svg: Element, ids: string[]): [number, number, number, number] | null {
+  const host = mountForMeasure(svg)
+  try {
+    const live = host.firstElementChild as SVGSVGElement
+    const origin = live.getBoundingClientRect()
+    // The SVG renders at width/height == viewBox size, so 1 CSS px == 1 unit.
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const id of ids) {
+      const el = live.querySelector(`[id="${CSS.escape(id)}"]`)
+      if (!el) continue
+      let r = rectOf(el)
+      // Masks: intersect with each ancestor's clip region.
+      for (let p: Element | null = el; p && p !== live; p = p.parentElement) {
+        const m = /url\(#([^)]+)\)/.exec(p.getAttribute('clip-path') ?? '')
+        const clip = m && live.querySelector(`[id="${CSS.escape(m[1])}"]`)
+        if (!clip) continue
+        const probe = document.createElementNS(SVG_NS, 'g')
+        for (const c of clip.children) probe.appendChild(c.cloneNode(true))
+        p.appendChild(probe)
+        r = intersect(r, rectOf(probe))
+        probe.remove()
+      }
+      if (!r) continue
+      let pad = 0
+      for (const s of [el, ...el.querySelectorAll('[stroke-width]')]) {
+        if (s.getAttribute('stroke') && s.getAttribute('stroke') !== 'none')
+          pad = Math.max(pad, n(parseFloat(s.getAttribute('stroke-width') ?? '')) / 2)
+      }
+      x0 = Math.min(x0, r.left - pad)
+      y0 = Math.min(y0, r.top - pad)
+      x1 = Math.max(x1, r.right + pad)
+      y1 = Math.max(y1, r.bottom + pad)
+    }
+    if (!(x1 > x0 && y1 > y0)) return null
+    // Back to the SVG's own (viewBox) coordinates.
+    const vb = live.viewBox.baseVal
+    const sx = vb && vb.width ? vb.width / origin.width : 1
+    const sy = vb && vb.height ? vb.height / origin.height : 1
+    const ox = vb ? vb.x : 0
+    const oy = vb ? vb.y : 0
+    return [ox + (x0 - origin.left) * sx, oy + (y0 - origin.top) * sy, (x1 - x0) * sx, (y1 - y0) * sy]
+  } finally {
+    host.remove()
+  }
+}
+
+type Rect = { left: number; top: number; right: number; bottom: number }
+
+function rectOf(el: Element): Rect | null {
+  const r = el.getBoundingClientRect()
+  return r.width || r.height ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null
+}
+
+function intersect(a: Rect | null, b: Rect | null): Rect | null {
+  if (!a) return null
+  if (!b) return a // unmeasurable clip: keep the element's own box
+  const r = {
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  }
+  return r.right > r.left && r.bottom > r.top ? r : null
+}
+
+/** Depth-first visit of a layer tree. */
+export function walkLayers(layers: XdLayer[], fn: (l: XdLayer) => void) {
+  for (const l of layers) {
+    fn(l)
+    walkLayers(l.children, fn)
+  }
 }
