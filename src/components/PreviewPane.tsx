@@ -11,21 +11,27 @@ interface Props {
   viewOptions: VectorViewOptions
   background: BackgroundMode
   customBg: string
+  /** Show the SVG as-is (skip tracer view options). Used for Adobe XD artboards. */
+  passthrough?: boolean
 }
 
 // The SVG is inlined (not <img>) so render/visibility toggles can manipulate its
 // paths. We apply the view options to the SVG string and inject the result.
-function useViewedSvgUrl(svg: string | null, opts: VectorViewOptions): string | null {
+function useViewedSvgUrl(
+  svg: string | null,
+  opts: VectorViewOptions,
+  passthrough: boolean,
+): string | null {
   return useMemo(() => {
     if (!svg) return null
     let out: string
     try {
-      out = applyView(svg, opts, true)
+      out = passthrough ? svg : applyView(svg, opts, true)
     } catch {
       out = svg
     }
     return URL.createObjectURL(new Blob([out], { type: 'image/svg+xml' }))
-  }, [svg, opts])
+  }, [svg, opts, passthrough])
 }
 
 export function PreviewPane({
@@ -35,12 +41,15 @@ export function PreviewPane({
   viewOptions,
   background,
   customBg,
+  passthrough = false,
 }: Props) {
-  const [view, setView] = useState<View>('split')
+  const [selectedView, setView] = useState<View>('split')
+  // Nothing to compare against without an original: show the vector alone.
+  const view: View = originalUrl ? selectedView : 'svg'
   const [split, setSplit] = useState(0.5)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const svgUrl = useViewedSvgUrl(svg, viewOptions)
+  const svgUrl = useViewedSvgUrl(svg, viewOptions, passthrough)
   const stageRef = useRef<HTMLDivElement>(null)
   const dragging = useRef<{ x: number; y: number } | null>(null)
 
@@ -115,7 +124,9 @@ export function PreviewPane({
               aria-selected={view === v}
               className={`${styles.tab} ${view === v ? styles.active : ''}`}
               onClick={() => setView(v)}
-              disabled={v !== 'original' && !hasResult}
+              disabled={
+                v === 'original' ? !originalUrl : v === 'svg' ? !hasResult : !hasResult || !originalUrl
+              }
             >
               {v === 'original' ? 'Original' : v === 'svg' ? 'Vector' : 'Split'}
             </button>

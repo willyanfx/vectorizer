@@ -133,3 +133,19 @@
     max-height: 45vh;
   }
 }
+
+.sideNote,
+.sideError {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.sideNote {
+  color: var(--text-dim);
+}
+
+.sideError {
+  color: var(--danger);
+  font-weight: 600;
+}

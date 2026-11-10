@@ -5,6 +5,8 @@ import { OptimizePanel } from './components/OptimizePanel'
 import { VectorToggles } from './components/VectorToggles'
 import { PreviewPane } from './components/PreviewPane'
 import { StatusBar } from './components/StatusBar'
+import { XdPanel } from './components/XdPanel'
+import { isXdFile, parseXd, setXdImageScale, toDisplaySvg, type XdDocument } from './lib/xd'
 import { useTracer } from './hooks/useTracer'
 import { useDebounce } from './hooks/useDebounce'
 import { useOptimize } from './hooks/useOptimize'
@@ -33,7 +35,82 @@ export default function App() {
   const [customBg, setCustomBg] = useState('#888888')
   const [hiddenColors, setHiddenColors] = useState<Set<string>>(new Set())
 
+  // Adobe XD mode: artboards are converted directly, no tracing.
+  const [xd, setXd] = useState<XdDocument | null>(null)
+  const [xdCurrent, setXdCurrent] = useState(0)
+  const [xdSelected, setXdSelected] = useState<Set<number>>(new Set())
+  const [xdStatus, setXdStatus] = useState<{ loading: string | null; error: string | null }>({
+    loading: null,
+    error: null,
+  })
+
+  const [xdImageBusy, setXdImageBusy] = useState<string | null>(null)
+
   const { state, runTrace } = useTracer()
+
+  const openFile = useCallback(async (f: File) => {
+    if (!isXdFile(f)) {
+      setXd(null)
+      setFile(f)
+      return
+    }
+    setFile(null)
+    setXdStatus({ loading: 'Reading XD file…', error: null })
+    try {
+      const doc = await parseXd(f, {
+        onProgress: (msg) => setXdStatus({ loading: msg, error: null }),
+      })
+      setXd(doc)
+      setXdCurrent(0)
+      setXdSelected(new Set(doc.artboards.map((_, i) => i)))
+      setXdStatus({ loading: null, error: null })
+    } catch (e) {
+      setXd(null)
+      setXdStatus({ loading: null, error: e instanceof Error ? e.message : String(e) })
+    }
+  }, [])
+
+  const changeXdImageScale = useCallback(
+    async (scale: number) => {
+      if (!xd) return
+      setXdImageBusy('Processing images…')
+      try {
+        setXd(await setXdImageScale(xd, scale, setXdImageBusy))
+      } catch (e) {
+        setXdStatus({ loading: null, error: e instanceof Error ? e.message : String(e) })
+      } finally {
+        setXdImageBusy(null)
+      }
+    },
+    [xd],
+  )
+
+  const reset = useCallback(() => {
+    setFile(null)
+    setXd(null)
+    setXdStatus({ loading: null, error: null })
+  }, [])
+
+  // Release the embedded preview's object URL when the XD doc goes away. Keyed
+  // on the URL, not the doc: changing image scale yields a new doc object that
+  // still shares the same preview URL.
+  const xdPreviewUrl = xd?.previewUrl ?? null
+  useEffect(() => {
+    return () => {
+      if (xdPreviewUrl) URL.revokeObjectURL(xdPreviewUrl)
+    }
+  }, [xdPreviewUrl])
+
+  const traceXdPreview = useCallback(async () => {
+    if (!xd?.previewUrl) return
+    const blob = await (await fetch(xd.previewUrl)).blob()
+    const name = `${xd.name}-preview.${blob.type === 'image/jpeg' ? 'jpg' : 'png'}`
+    setFile(new File([blob], name, { type: blob.type }))
+    setXd(null)
+  }, [xd])
+
+  const xdBoard = xd?.artboards[xdCurrent] ?? null
+  const xdDisplaySvg = useMemo(() => (xdBoard ? toDisplaySvg(xdBoard.svg) : null), [xdBoard])
 
   const debouncedParams = useDebounce(params, 300)
   const debouncedPre = useDebounce(preprocess, 300)
@@ -107,6 +184,7 @@ export default function App() {
 
   const busy = state.status === 'preprocessing' || state.status === 'tracing'
   const hasImage = !!file
+  const hasXd = !!xd
   const hasResult = !!state.svg
 
   return (
@@ -124,9 +202,9 @@ export default function App() {
           <span className={styles.tagline}>raster → SVG, in your browser</span>
         </div>
         <div className={styles.headerActions}>
-          {hasImage && (
-            <button className={styles.newBtn} onClick={() => setFile(null)}>
-              New image
+          {(hasImage || hasXd) && (
+            <button className={styles.newBtn} onClick={reset}>
+              {hasXd ? 'New file' : 'New image'}
             </button>
           )}
         </div>
@@ -134,8 +212,27 @@ export default function App() {
 
       <main className={styles.main}>
         <aside className={styles.sidebar}>
-          {!hasImage ? (
-            <DropZone onFile={setFile} />
+          {hasXd ? (
+            <XdPanel
+              doc={xd}
+              current={xdCurrent}
+              onCurrent={setXdCurrent}
+              selected={xdSelected}
+              onSelected={setXdSelected}
+              onTracePreview={xd.previewUrl ? () => void traceXdPreview() : undefined}
+              onImageScale={(s) => void changeXdImageScale(s)}
+              imageBusy={xdImageBusy}
+            />
+          ) : !hasImage ? (
+            <>
+              <DropZone onFile={(f) => void openFile(f)} disabled={!!xdStatus.loading} />
+              {xdStatus.loading && (
+                <p className={styles.sideNote} role="status">
+                  {xdStatus.loading}
+                </p>
+              )}
+              {xdStatus.error && <p className={styles.sideError}>⚠ {xdStatus.error}</p>}
+            </>
           ) : (
             <>
               <ParamsPanel
@@ -176,21 +273,35 @@ export default function App() {
         </aside>
 
         <section className={styles.preview}>
-          <PreviewPane
-            originalUrl={originalUrl}
-            svg={state.svg}
-            busy={busy}
-            viewOptions={viewOptions}
-            background={background}
-            customBg={customBg}
-          />
-          <StatusBar
-            state={state}
-            optimize={optimize}
-            fileName={file?.name ?? null}
-            exportSvg={exportSvg}
-            exportOptimizedSvg={optimize.optimized}
-          />
+          {hasXd ? (
+            <PreviewPane
+              originalUrl={null}
+              svg={xdDisplaySvg}
+              busy={false}
+              viewOptions={viewOptions}
+              background={background}
+              customBg={customBg}
+              passthrough
+            />
+          ) : (
+            <>
+              <PreviewPane
+                originalUrl={originalUrl}
+                svg={state.svg}
+                busy={busy}
+                viewOptions={viewOptions}
+                background={background}
+                customBg={customBg}
+              />
+              <StatusBar
+                state={state}
+                optimize={optimize}
+                fileName={file?.name ?? null}
+                exportSvg={exportSvg}
+                exportOptimizedSvg={optimize.optimized}
+              />
+            </>
+          )}
         </section>
       </main>
     </div>

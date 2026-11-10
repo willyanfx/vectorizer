@@ -1,5 +1,7 @@
 import type { TraceState } from '../hooks/useTracer'
 import type { OptimizeState } from '../hooks/useOptimize'
+import { useState } from 'react'
+import { downloadPdf, downloadSvg } from '../lib/exportFiles'
 import styles from './StatusBar.module.css'
 
 interface Props {
@@ -12,24 +14,6 @@ interface Props {
   exportOptimizedSvg: string | null
 }
 
-function download(content: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'image/svg+xml' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  // The anchor must be in the document for the click to reliably start a
-  // download in Firefox, and the url must outlive the click: revoking it
-  // synchronously races the download in Safari/Firefox and can yield an empty
-  // file. Defer the revoke (and the removal) to the next macrotask.
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  setTimeout(() => {
-    a.remove()
-    URL.revokeObjectURL(url)
-  }, 0)
-}
-
 function bytes(n: number): string {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
@@ -38,6 +22,21 @@ function bytes(n: number): string {
 
 export function StatusBar({ state, optimize, fileName, exportSvg, exportOptimizedSvg }: Props) {
   const baseName = fileName?.replace(/\.[^.]+$/, '') || 'vector'
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
+  const exportPdf = async () => {
+    if (!exportSvg) return
+    setPdfBusy(true)
+    setPdfError(null)
+    try {
+      await downloadPdf([exportSvg], `${baseName}.pdf`)
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   return (
     <div className={styles.bar}>
@@ -71,6 +70,8 @@ export function StatusBar({ state, optimize, fileName, exportSvg, exportOptimize
           </>
         )}
 
+        {pdfError && <span className={styles.error}>⚠ PDF: {pdfError}</span>}
+
         {state.usedFallback && (
           <span className={styles.warn} title={state.fallbackReason ?? ''}>
             Using CPU tracer (WebAssembly unavailable)
@@ -82,14 +83,21 @@ export function StatusBar({ state, optimize, fileName, exportSvg, exportOptimize
         <button
           className={`${styles.button} ${styles.secondary}`}
           disabled={!exportSvg}
-          onClick={() => exportSvg && download(exportSvg, `${baseName}.svg`)}
+          onClick={() => exportSvg && downloadSvg(exportSvg, `${baseName}.svg`)}
         >
           Download SVG
         </button>
         <button
+          className={`${styles.button} ${styles.secondary}`}
+          disabled={!exportSvg || pdfBusy}
+          onClick={exportPdf}
+        >
+          {pdfBusy ? 'Building PDF…' : 'Download PDF'}
+        </button>
+        <button
           className={styles.button}
           disabled={!exportOptimizedSvg || optimize.optimizing}
-          onClick={() => exportOptimizedSvg && download(exportOptimizedSvg, `${baseName}.min.svg`)}
+          onClick={() => exportOptimizedSvg && downloadSvg(exportOptimizedSvg, `${baseName}.min.svg`)}
         >
           {optimize.optimizing ? 'Optimizing…' : 'Download optimized'}
         </button>

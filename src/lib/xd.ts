@@ -1,0 +1,826 @@
+// Adobe XD (.xd) → SVG, fully in the browser.
+//
+// A local .xd file is a ZIP archive. The parts we care about:
+//   manifest                                       JSON: artboard list (names, bounds)
+//   artwork/artboard-<id>/graphics/graphicContent.agc   JSON scene graph per artboard
+//   resources/graphics/graphicContent.agc          JSON: shared gradients, clip paths,
+//                                                  artboard bounds
+//   resources/<uid>                                raw image bytes (pattern fills)
+//
+// The .agc format is undocumented, so this renderer is deliberately defensive:
+// it understands the common node types (shapes, groups, text, image fills,
+// gradients, strokes, drop shadows, masks) and silently skips anything else,
+// counting it in `skipped` so the UI can say the result may be incomplete.
+//
+// Cloud documents (saved to Creative Cloud, not as a local .xd) are not ZIPs
+// and cannot be read here — the user must "Save As" a local file first.
+
+import { unzip, type Unzipped } from 'fflate'
+
+/* eslint-disable @typescript-eslint/no-explicit-any -- .agc is untyped JSON */
+type Json = any
+
+export interface XdArtboard {
+  id: string
+  name: string
+  width: number
+  height: number
+  /** Export SVG: fixed width/height so design tools keep the intended size. */
+  svg: string
+  /** Number of nodes the renderer did not understand and skipped. */
+  skipped: number
+  /** SVG with image placeholders, re-filled when the image scale changes. */
+  template: string
+}
+
+export interface XdDocument {
+  name: string
+  artboards: XdArtboard[]
+  /** Embedded raster preview, if the file has one (object URL). */
+  previewUrl: string | null
+  /** Current image scale (see ParseXdOptions.imageScale). */
+  imageScale: number
+  /** Original file + image sizes, so images can be re-processed at another scale. */
+  source: { file: File; imageNeeds: Map<string, { w: number; h: number }> }
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const td = new TextDecoder()
+
+function unzipAsync(data: Uint8Array, filter?: (name: string) => boolean): Promise<Unzipped> {
+  return new Promise((resolve, reject) =>
+    unzip(data, filter ? { filter: (f) => filter(f.name) } : {}, (err, files) =>
+      err ? reject(err) : resolve(files),
+    ),
+  )
+}
+
+function readJson(files: Unzipped, path: string): Json | null {
+  const bytes = files[path]
+  if (!bytes) return null
+  try {
+    return JSON.parse(td.decode(bytes))
+  } catch {
+    return null
+  }
+}
+
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+const n = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : d)
+const fmt = (v: number) => String(Math.round(v * 1000) / 1000)
+
+function sniffMime(b: Uint8Array): string | null {
+  if (b[0] === 0x89 && b[1] === 0x50) return 'image/png'
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg'
+  if (b[0] === 0x47 && b[1] === 0x49) return 'image/gif'
+  if (b[0] === 0x52 && b[1] === 0x49 && b[8] === 0x57) return 'image/webp'
+  if (b[0] === 0x3c) return 'image/svg+xml' // '<'
+  return null
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+/* ------------------------------------------------------------------ colors */
+
+function color(c: Json): { value: string; alpha: number } | null {
+  if (!c) return null
+  const v = c.value ?? c
+  if (typeof v === 'object' && 'r' in v) {
+    const hex = [v.r, v.g, v.b]
+      .map((x: number) => Math.max(0, Math.min(255, Math.round(n(x)))).toString(16).padStart(2, '0'))
+      .join('')
+    return { value: `#${hex}`, alpha: n(c.alpha, 1) }
+  }
+  return null
+}
+
+/* ----------------------------------------------------------- render context */
+
+interface Ctx {
+  files: Unzipped
+  gradients: Record<string, Json>
+  clipPaths: Record<string, Json>
+  defs: string[]
+  ids: number
+  skipped: number
+  /** Component masters + pasteboard nodes by id, for resolving syncRef instances. */
+  symbols: Map<string, Json>
+  /** Images referenced by this artboard: uid → largest displayed size (px). */
+  imageNeeds: Map<string, { w: number; h: number }>
+  depth: number
+}
+
+const uid = (ctx: Ctx, p: string) => `${p}${++ctx.ids}`
+
+function transformAttr(t: Json): string {
+  if (!t || typeof t !== 'object') return ''
+  const { a = 1, b = 0, c = 0, d = 1, tx = 0, ty = 0 } = t
+  if (a === 1 && b === 0 && c === 0 && d === 1) {
+    return tx || ty ? ` transform="translate(${fmt(tx)} ${fmt(ty)})"` : ''
+  }
+  return ` transform="matrix(${[a, b, c, d, tx, ty].map((x) => fmt(n(x))).join(' ')})"`
+}
+
+function gradientDef(ctx: Ctx, g: Json): string | null {
+  const res = ctx.gradients[g.ref] ?? g.meta?.ux?.gradientResources ?? null
+  const stops: Json[] = res?.stops ?? []
+  if (stops.length === 0) return null
+  const id = uid(ctx, 'g')
+  const units = g.units === 'userSpaceOnUse' ? 'userSpaceOnUse' : 'objectBoundingBox'
+  const stopXml = stops
+    .map((s) => {
+      const c = color(s.color)
+      if (!c) return ''
+      const op = c.alpha < 1 ? ` stop-opacity="${fmt(c.alpha)}"` : ''
+      return `<stop offset="${fmt(n(s.offset))}" stop-color="${c.value}"${op}/>`
+    })
+    .join('')
+  const gt = g.gradientTransform
+    ? ` gradientTransform="matrix(${['a', 'b', 'c', 'd', 'tx', 'ty']
+        .map((k) => fmt(n(g.gradientTransform[k], k === 'a' || k === 'd' ? 1 : 0)))
+        .join(' ')})"`
+    : ''
+  if ((res?.type ?? g.type) === 'radial' || 'r' in g) {
+    ctx.defs.push(
+      `<radialGradient id="${id}" gradientUnits="${units}" cx="${fmt(n(g.cx, 0.5))}" cy="${fmt(n(g.cy, 0.5))}" r="${fmt(n(g.r, 0.5))}"${'fx' in g ? ` fx="${fmt(n(g.fx))}" fy="${fmt(n(g.fy))}"` : ''}${gt}>${stopXml}</radialGradient>`,
+    )
+  } else {
+    ctx.defs.push(
+      `<linearGradient id="${id}" gradientUnits="${units}" x1="${fmt(n(g.x1))}" y1="${fmt(n(g.y1))}" x2="${fmt(n(g.x2, 1))}" y2="${fmt(n(g.y2))}"${gt}>${stopXml}</linearGradient>`,
+    )
+  }
+  return `url(#${id})`
+}
+
+// Images are emitted as placeholders and swapped for (downscaled) data URIs
+// afterwards — embedding a 30 MB PNG as-is would make the SVG/PDF unusable.
+const IMG_TOKEN = (key: string) => `__XDIMG_${key}__`
+
+function imageHref(ctx: Ctx, pattern: Json, w: number, h: number): string | null {
+  const key: string | undefined =
+    pattern?.meta?.ux?.uid ?? (typeof pattern?.href === 'string' ? pattern.href.replace(/^\//, '') : undefined)
+  if (!key || !/^[\w.-]+$/.test(key)) return null
+  if (!ctx.files[`resources/${key}`]) return null
+  const prev = ctx.imageNeeds.get(key)
+  ctx.imageNeeds.set(key, { w: Math.max(prev?.w ?? 0, w), h: Math.max(prev?.h ?? 0, h) })
+  return IMG_TOKEN(key)
+}
+
+/** fill / stroke / opacity / filter attributes for a node's style. */
+function paintAttrs(ctx: Ctx, style: Json, isText = false): string {
+  let out = ''
+  const fill = style?.fill
+  if (!fill || fill.type === 'none') {
+    out += ' fill="none"'
+  } else if (fill.type === 'solid' || (fill.color && !fill.type)) {
+    const c = color(fill.color)
+    if (c) {
+      out += ` fill="${c.value}"`
+      if (c.alpha < 1) out += ` fill-opacity="${fmt(c.alpha)}"`
+    } else out += ' fill="none"'
+  } else if (fill.type === 'gradient' && fill.gradient) {
+    out += ` fill="${gradientDef(ctx, fill.gradient) ?? 'none'}"`
+  } else if (fill.type === 'pattern') {
+    out += ' fill="none"' // image is drawn separately, clipped to the shape
+  } else if (!isText) {
+    out += ' fill="none"'
+  }
+
+  const stroke = style?.stroke
+  if (stroke && stroke.type !== 'none' && n(stroke.width) > 0) {
+    let paint: string | null = null
+    let alpha = 1
+    if (stroke.type === 'gradient' && stroke.gradient) paint = gradientDef(ctx, stroke.gradient)
+    else {
+      const c = color(stroke.color)
+      if (c) ({ value: paint, alpha } = c)
+    }
+    if (paint) {
+      out += ` stroke="${paint}" stroke-width="${fmt(n(stroke.width))}"`
+      if (alpha < 1) out += ` stroke-opacity="${fmt(alpha)}"`
+      if (stroke.cap) out += ` stroke-linecap="${esc(stroke.cap)}"`
+      if (stroke.join) out += ` stroke-linejoin="${esc(stroke.join)}"`
+      if (stroke.miterLimit) out += ` stroke-miterlimit="${fmt(n(stroke.miterLimit))}"`
+      if (Array.isArray(stroke.dash) && stroke.dash.length)
+        out += ` stroke-dasharray="${stroke.dash.map((d: number) => fmt(n(d))).join(' ')}"`
+    }
+  }
+  return out
+}
+
+function nodeAttrs(ctx: Ctx, node: Json): string {
+  const style = node.style ?? {}
+  let out = transformAttr(node.transform)
+  if (style.opacity != null && n(style.opacity, 1) < 1) out += ` opacity="${fmt(n(style.opacity))}"`
+  if (style.blendMode && style.blendMode !== 'pass-through' && style.blendMode !== 'normal')
+    out += ` style="mix-blend-mode:${esc(style.blendMode)}"`
+
+  const filters: Json[] = Array.isArray(style.filters) ? style.filters : []
+  const prims: string[] = []
+  for (const f of filters) {
+    if (f.visible === false || f.params?.visible === false) continue
+    if (f.type === 'dropShadow') {
+      for (const s of f.params?.dropShadowList ?? []) {
+        const c = color(s.color)
+        if (!c) continue
+        prims.push(
+          `<feDropShadow dx="${fmt(n(s.dx))}" dy="${fmt(n(s.dy))}" stdDeviation="${fmt(n(s.r) / 2)}" flood-color="${c.value}" flood-opacity="${fmt(c.alpha)}"/>`,
+        )
+      }
+    } else if (f.type === 'uxdesign#blur' || f.type === 'blur') {
+      const r = n(f.params?.blurAmount ?? f.params?.r)
+      if (r > 0 && !f.params?.backgroundEffect) prims.push(`<feGaussianBlur stdDeviation="${fmt(r / 2)}"/>`)
+    }
+  }
+  if (prims.length) {
+    const id = uid(ctx, 'f')
+    ctx.defs.push(
+      `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">${prims.join('')}</filter>`,
+    )
+    out += ` filter="url(#${id})"`
+  }
+  return out
+}
+
+/* ------------------------------------------------------------------ shapes */
+
+function rectPath(x: number, y: number, w: number, h: number, r: number[]): string {
+  const [tl, tr, br, bl] = r.map((v) => Math.min(v, w / 2, h / 2))
+  return (
+    `M${fmt(x + tl)} ${fmt(y)}H${fmt(x + w - tr)}` +
+    (tr ? `A${fmt(tr)} ${fmt(tr)} 0 0 1 ${fmt(x + w)} ${fmt(y + tr)}` : '') +
+    `V${fmt(y + h - br)}` +
+    (br ? `A${fmt(br)} ${fmt(br)} 0 0 1 ${fmt(x + w - br)} ${fmt(y + h)}` : '') +
+    `H${fmt(x + bl)}` +
+    (bl ? `A${fmt(bl)} ${fmt(bl)} 0 0 1 ${fmt(x)} ${fmt(y + h - bl)}` : '') +
+    `V${fmt(y + tl)}` +
+    (tl ? `A${fmt(tl)} ${fmt(tl)} 0 0 1 ${fmt(x + tl)} ${fmt(y)}` : '') +
+    'Z'
+  )
+}
+
+/** Geometry element (no paint) + its bounding box, or null if unknown. */
+function geometry(shape: Json): { el: string; box: [number, number, number, number] } | null {
+  switch (shape?.type) {
+    case 'rect': {
+      const x = n(shape.x), y = n(shape.y), w = n(shape.width), h = n(shape.height)
+      const r: number[] = Array.isArray(shape.r) ? shape.r.map((v: unknown) => n(v)) : [n(shape.r), n(shape.r), n(shape.r), n(shape.r)]
+      const box: [number, number, number, number] = [x, y, w, h]
+      if (r.every((v) => v === r[0])) {
+        const rr = r[0] ? ` rx="${fmt(Math.min(r[0], w / 2, h / 2))}"` : ''
+        return { el: `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}"${rr}`, box }
+      }
+      return { el: `<path d="${rectPath(x, y, w, h, r)}"`, box }
+    }
+    case 'ellipse': {
+      const cx = n(shape.cx), cy = n(shape.cy), rx = n(shape.rx), ry = n(shape.ry)
+      return { el: `<ellipse cx="${fmt(cx)}" cy="${fmt(cy)}" rx="${fmt(rx)}" ry="${fmt(ry)}"`, box: [cx - rx, cy - ry, rx * 2, ry * 2] }
+    }
+    case 'circle': {
+      const cx = n(shape.cx), cy = n(shape.cy), r = n(shape.r)
+      return { el: `<circle cx="${fmt(cx)}" cy="${fmt(cy)}" r="${fmt(r)}"`, box: [cx - r, cy - r, r * 2, r * 2] }
+    }
+    case 'line': {
+      const x1 = n(shape.x1), y1 = n(shape.y1), x2 = n(shape.x2), y2 = n(shape.y2)
+      return {
+        el: `<line x1="${fmt(x1)}" y1="${fmt(y1)}" x2="${fmt(x2)}" y2="${fmt(y2)}"`,
+        box: [Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1)],
+      }
+    }
+    case 'polygon':
+    case 'polyline': {
+      // Polygons usually also carry a precomputed path; prefer that.
+      if (Array.isArray(shape.points) && !shape.path) {
+        const pts: Array<{ x: number; y: number }> = shape.points
+        const xs = pts.map((p) => n(p.x)), ys = pts.map((p) => n(p.y))
+        const minX = Math.min(...xs), minY = Math.min(...ys)
+        return {
+          el: `<${shape.type} points="${pts.map((p) => `${fmt(n(p.x))},${fmt(n(p.y))}`).join(' ')}"`,
+          box: [minX, minY, Math.max(...xs) - minX, Math.max(...ys) - minY],
+        }
+      }
+      return pathGeometry(shape)
+    }
+    default: // path, compound (boolean ops are pre-flattened into .path), unknown
+      return pathGeometry(shape)
+  }
+}
+
+function pathGeometry(shape: Json): { el: string; box: [number, number, number, number] } | null {
+  if (typeof shape?.path !== 'string' || !shape.path) return null
+  const rule = shape.fillRule === 'evenodd' || shape.winding === 'evenodd' ? ' fill-rule="evenodd"' : ''
+  return { el: `<path d="${esc(shape.path)}"${rule}`, box: pathBox(shape) }
+}
+
+/** Approximate bbox of an XD path (XD writes absolute M/L/C/Z commands). */
+function pathBox(shape: Json): [number, number, number, number] {
+  if (n(shape.width) && n(shape.height)) return [0, 0, n(shape.width), n(shape.height)]
+  const nums = (shape.path as string).match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)?.map(Number) ?? []
+  if (nums.length < 2) return [0, 0, 0, 0]
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    minX = Math.min(minX, nums[i]); maxX = Math.max(maxX, nums[i])
+    minY = Math.min(minY, nums[i + 1]); maxY = Math.max(maxY, nums[i + 1])
+  }
+  return [minX, minY, maxX - minX, maxY - minY]
+}
+
+function renderShape(ctx: Ctx, node: Json): string {
+  const geo = geometry(node.shape)
+  if (!geo) {
+    ctx.skipped++
+    return ''
+  }
+  const style = node.style ?? {}
+  const attrs = nodeAttrs(ctx, node)
+  const shapeEl = `${geo.el}${paintAttrs(ctx, style)}/>`
+  if (style.fill?.type !== 'pattern') return `<g${attrs}>${shapeEl}</g>`
+
+  // Image fill: clip the image to the shape, then draw the stroke on top.
+  const [x, y] = geo.box
+  let [, , w, h] = geo.box
+  if (!w || !h) {
+    w = n(style.fill.pattern.width)
+    h = n(style.fill.pattern.height)
+  }
+  const href = imageHref(ctx, style.fill.pattern, w, h)
+  if (!href) return `<g${attrs}>${shapeEl}</g>`
+  const clipId = uid(ctx, 'c')
+  ctx.defs.push(`<clipPath id="${clipId}">${geo.el}/></clipPath>`)
+  const fit = style.fill.pattern.meta?.ux?.scaleBehavior === 'fill' ? 'none' : 'xMidYMid slice'
+  return (
+    `<g${attrs}><g clip-path="url(#${clipId})"><image x="${fmt(x)}" y="${fmt(y)}" width="${fmt(w)}" height="${fmt(h)}" preserveAspectRatio="${fit}" xlink:href="${href}"/></g>` +
+    shapeEl.replace(/ fill="[^"]*"/, ' fill="none"') +
+    '</g>'
+  )
+}
+
+/* -------------------------------------------------------------------- text */
+
+const WEIGHTS: Array<[RegExp, number]> = [
+  [/thin|hairline/i, 100],
+  [/extra ?light|ultra ?light/i, 200],
+  [/light/i, 300],
+  [/medium/i, 500],
+  [/semi ?bold|demi ?bold/i, 600],
+  [/extra ?bold|ultra ?bold/i, 800],
+  [/black|heavy/i, 900],
+  [/bold/i, 700],
+]
+
+function fontAttrs(font: Json): string {
+  if (!font) return ''
+  let out = ''
+  if (font.family) {
+    const ps = font.postscriptName && font.postscriptName !== font.family ? `, '${font.postscriptName}'` : ''
+    out += ` font-family="${esc(`'${font.family}'${ps}, sans-serif`)}"`
+  }
+  if (font.size) out += ` font-size="${fmt(n(font.size))}"`
+  // XD often encodes weight in the family ("Sharp Grotesk Bold") with a numeric style ("19").
+  const st = `${font.family ?? ''} ${font.style ?? ''}`
+  const w = WEIGHTS.find(([re]) => re.test(st))
+  if (w) out += ` font-weight="${w[1]}"`
+  if (/italic|oblique/i.test(st)) out += ' font-style="italic"'
+  return out
+}
+
+function renderText(ctx: Ctx, node: Json): string {
+  const t = node.text
+  const raw: string = t?.rawText ?? ''
+  const style = node.style ?? {}
+  const attrs = nodeAttrs(ctx, node)
+  const base = fontAttrs(style.font) + paintAttrs(ctx, style, true)
+  const ls = n(style.textAttributes?.letterSpacing)
+  const spacing = ls ? ` letter-spacing="${fmt((ls / 1000) * n(style.font?.size, 16))}"` : ''
+
+  // Ranged styles: [{length, fontFamily, fontSize, fontStyle, fill}] covering rawText.
+  const ranges: Array<{ from: number; to: number; s: Json }> = []
+  let pos = 0
+  for (const r of node.meta?.ux?.rangedStyles ?? []) {
+    const len = n(r.length)
+    ranges.push({ from: pos, to: pos + len, s: r })
+    pos += len
+  }
+  const rangeAttrs = (s: Json) => {
+    let a = fontAttrs({ family: s.fontFamily, size: s.fontSize, style: s.fontStyle })
+    const c = color(s.fill)
+    if (c) a += ` fill="${c.value}"${c.alpha < 1 ? ` fill-opacity="${fmt(c.alpha)}"` : ''}`
+    return a
+  }
+
+  const segment = (from: number, to: number) => {
+    if (ranges.length <= 1) return esc(raw.slice(from, to))
+    return ranges
+      .filter((r) => r.to > from && r.from < to)
+      .map((r) => `<tspan${rangeAttrs(r.s)}>${esc(raw.slice(Math.max(from, r.from), Math.min(to, r.to)))}</tspan>`)
+      .join('')
+  }
+
+  let body = ''
+  const paragraphs: Json[] = t?.paragraphs ?? []
+  if (paragraphs.length) {
+    for (const p of paragraphs) {
+      for (const line of p.lines ?? []) {
+        for (const seg of line ?? []) {
+          const from = n(seg.from), to = n(seg.to, raw.length)
+          if (to <= from) continue
+          // Segments can override the node style (e.g. a bold first line).
+          let segAttrs = ''
+          if (seg.style) {
+            segAttrs = fontAttrs(seg.style.font)
+            const c = color(seg.style.fill?.color)
+            if (c) segAttrs += ` fill="${c.value}"${c.alpha < 1 ? ` fill-opacity="${fmt(c.alpha)}"` : ''}`
+          }
+          body += `<tspan x="${fmt(n(seg.x))}" y="${fmt(n(seg.y))}"${segAttrs}>${segment(from, to)}</tspan>`
+        }
+      }
+    }
+  } else if (raw) {
+    // No layout info: fall back to one line per hard break.
+    const lh = n(style.textAttributes?.lineHeight, n(style.font?.size, 16) * 1.2)
+    body = raw
+      .split(/\r?\n/)
+      .map((l, i) => `<tspan x="0" y="${fmt(i * lh)}">${esc(l)}</tspan>`)
+      .join('')
+  }
+  if (!body) return ''
+  return `<g${attrs}><text xml:space="preserve"${base}${spacing}>${body}</text></g>`
+}
+
+/* ----------------------------------------------------------------- traverse */
+
+function clipFor(ctx: Ctx, node: Json): string {
+  const ref = node.style?.clipPath?.ref
+  const res = (ref && ctx.clipPaths[ref]) || node.meta?.ux?.clipPathResources
+  const children: Json[] = res?.children ?? []
+  if (!children.length) return ''
+  // <g> isn't allowed inside <clipPath>, so put each transform on the shape itself.
+  const inner = children
+    .map((c) => {
+      const geo = c.shape ? geometry(c.shape) : null
+      return geo ? `${geo.el}${transformAttr(c.transform)}/>` : ''
+    })
+    .join('')
+  if (!inner) return ''
+  const id = uid(ctx, 'm')
+  ctx.defs.push(`<clipPath id="${id}">${inner}</clipPath>`)
+  return ` clip-path="url(#${id})"`
+}
+
+function renderNode(ctx: Ctx, node: Json): string {
+  if (!node || node.visible === false) return ''
+  if (ctx.depth > 64) {
+    ctx.skipped++
+    return ''
+  }
+  // A childless syncRef is a linked copy of a node inside a component master.
+  if (node.type === 'syncRef' && !Array.isArray(node.group?.children)) {
+    const src = ctx.symbols.get(node.syncSourceGuid)
+    if (!src) {
+      ctx.skipped++
+      return ''
+    }
+    ctx.depth++
+    const out = renderNode(ctx, node.transform ? { ...src, transform: node.transform } : src)
+    ctx.depth--
+    return out
+  }
+  ctx.depth++
+  try {
+    return renderNodeInner(ctx, node)
+  } finally {
+    ctx.depth--
+  }
+}
+
+function renderNodeInner(ctx: Ctx, node: Json): string {
+  switch (node.type) {
+    case 'shape':
+      return renderShape(ctx, node)
+    case 'text':
+      return renderText(ctx, node)
+    default: {
+      // group, syncRef (component instance), repeat grid, boolean group…
+      const kids: Json[] | undefined = node.group?.children ?? node.children
+      if (Array.isArray(kids)) {
+        const clip = clipFor(ctx, node)
+        return `<g${nodeAttrs(ctx, node)}${clip}>${kids.map((k) => renderNode(ctx, k)).join('')}</g>`
+      }
+      if (node.shape) return renderShape(ctx, node)
+      ctx.skipped++
+      return ''
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ public */
+
+interface ArtboardEntry {
+  id: string
+  path: string
+  name: string
+  bounds: Json
+}
+
+function listArtboards(files: Unzipped, manifest: Json): ArtboardEntry[] {
+  const out: ArtboardEntry[] = []
+  const walk = (node: Json) => {
+    if (!node || typeof node !== 'object') return
+    if (typeof node.path === 'string' && node.path.startsWith('artboard-')) {
+      out.push({
+        id: node.path,
+        path: `artwork/${node.path}/graphics/graphicContent.agc`,
+        name: node.name ?? node.path,
+        bounds: node['uxdesign#bounds'],
+      })
+    }
+    for (const c of node.children ?? []) walk(c)
+  }
+  walk(manifest)
+  // Fallback when the manifest shape is unfamiliar: scan the archive.
+  if (out.length === 0) {
+    for (const p of Object.keys(files)) {
+      const m = /^artwork\/(artboard-[^/]+)\/graphics\/graphicContent\.agc$/.exec(p)
+      if (m) out.push({ id: m[1], path: p, name: m[1], bounds: null })
+    }
+  }
+  return out.filter((a) => files[a.path])
+}
+
+function indexSymbols(...roots: Json[]): Map<string, Json> {
+  const map = new Map<string, Json>()
+  const walk = (v: Json) => {
+    if (Array.isArray(v)) v.forEach(walk)
+    else if (v && typeof v === 'object') {
+      if (typeof v.id === 'string' && typeof v.type === 'string') map.set(v.id, v)
+      for (const k in v) if (k !== 'style' && k !== 'shape' && k !== 'text') walk(v[k])
+    }
+  }
+  roots.forEach(walk)
+  return map
+}
+
+interface RenderedArtboard extends Omit<XdArtboard, 'template'> {
+  imageNeeds: Map<string, { w: number; h: number }>
+}
+
+function renderArtboard(
+  files: Unzipped,
+  entry: ArtboardEntry,
+  shared: Json,
+  symbols: Map<string, Json>,
+): RenderedArtboard {
+  const agc = readJson(files, entry.path)
+  const ctx: Ctx = {
+    files,
+    gradients: { ...(shared?.resources?.gradients ?? {}), ...(agc?.resources?.gradients ?? {}) },
+    clipPaths: { ...(shared?.resources?.clipPaths ?? {}), ...(agc?.resources?.clipPaths ?? {}) },
+    defs: [],
+    ids: 0,
+    skipped: 0,
+    symbols,
+    imageNeeds: new Map(),
+    depth: 0,
+  }
+  const roots: Json[] = agc?.children ?? []
+  const abNode = roots.find((c) => c.type === 'artboard')
+  const boards = shared?.artboards ?? {}
+  const ref: string = abNode?.artboard?.ref ?? ''
+  const info = boards[ref] ?? boards[`artboard-${ref}`] ?? boards[entry.id] ?? boards[entry.id.replace(/^artboard-/, '')] ?? {}
+  const width = n(info.width, n(entry.bounds?.width, n(abNode?.artboard?.width, 1)))
+  const height = n(info.height, n(entry.bounds?.height, n(abNode?.artboard?.height, 1)))
+  const ox = n(info.x, n(entry.bounds?.x))
+  const oy = n(info.y, n(entry.bounds?.y))
+
+  const children: Json[] = abNode?.artboard?.children ?? (abNode ? [] : roots)
+  const body = children.map((c) => renderNode(ctx, c)).join('')
+
+  let bg = ''
+  const bgc = color(abNode?.style?.fill?.color)
+  if (bgc && abNode?.style?.fill?.type !== 'none')
+    bg = `<rect width="${fmt(width)}" height="${fmt(height)}" fill="${bgc.value}"${bgc.alpha < 1 ? ` fill-opacity="${fmt(bgc.alpha)}"` : ''}/>`
+
+  // Children are stored in artboard-local coordinates in the files we've seen,
+  // but older files use pasteboard coordinates. Detect the latter by measuring.
+  const content = `<g id="content">${body}</g>`
+  const shift = needsPasteboardShift(ctx.defs, content, width, height, ox, oy)
+  const placed = shift ? `<g transform="translate(${fmt(-ox)} ${fmt(-oy)})">${content}</g>` : content
+
+  const svg =
+    `<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" width="${fmt(width)}" height="${fmt(height)}" viewBox="0 0 ${fmt(width)} ${fmt(height)}">` +
+    `<title>${esc(entry.name)}</title>` +
+    (ctx.defs.length ? `<defs>${ctx.defs.join('')}</defs>` : '') +
+    `<clipPath id="artboard-clip"><rect width="${fmt(width)}" height="${fmt(height)}"/></clipPath>` +
+    `<g clip-path="url(#artboard-clip)">${bg}${placed}</g></svg>`
+
+  return { id: entry.id, name: entry.name, width, height, svg, skipped: ctx.skipped, imageNeeds: ctx.imageNeeds }
+}
+
+/** True if the content's bbox sits at the artboard's pasteboard position rather than at 0,0. */
+function needsPasteboardShift(defs: string[], content: string, w: number, h: number, ox: number, oy: number): boolean {
+  if (!ox && !oy) return false
+  if (typeof document === 'undefined') return false
+  // Parse as XML (inert: no script execution) and measure off-screen.
+  const parsed = new DOMParser().parseFromString(
+    `<svg xmlns="${SVG_NS}"><defs>${defs.join('')}</defs>${content}</svg>`,
+    'image/svg+xml',
+  )
+  if (parsed.querySelector('parsererror')) return false
+  const host = document.createElement('div')
+  host.style.cssText = 'position:absolute;left:-99999px;top:0;width:0;height:0;overflow:hidden'
+  host.appendChild(document.importNode(parsed.documentElement, true))
+  document.body.appendChild(host)
+  try {
+    const g = host.querySelector('#content') as SVGGraphicsElement | null
+    const b = g?.getBBox()
+    if (!b || (!b.width && !b.height)) return false
+    const overlap = (x: number, y: number) =>
+      Math.max(0, Math.min(b.x + b.width, x + w) - Math.max(b.x, x)) *
+      Math.max(0, Math.min(b.y + b.height, y + h) - Math.max(b.y, y))
+    return overlap(ox, oy) > overlap(0, 0)
+  } catch {
+    return false
+  } finally {
+    host.remove()
+  }
+}
+
+export function isXdFile(file: File): boolean {
+  return /\.xd$/i.test(file.name)
+}
+
+export interface ParseXdOptions {
+  /**
+   * Embedded images are downscaled to this multiple of their on-artboard size
+   * (2 = retina-sharp). 0 keeps the original files untouched. XD files often
+   * carry 20–30 MB source PNGs that would otherwise bloat the SVG and PDF.
+   */
+  imageScale?: number
+  onProgress?: (message: string) => void
+}
+
+export async function parseXd(file: File, opts: ParseXdOptions = {}): Promise<XdDocument> {
+  const { imageScale = 2, onProgress } = opts
+  const data = new Uint8Array(await file.arrayBuffer())
+  if (data[0] !== 0x50 || data[1] !== 0x4b) {
+    throw new Error(
+      'This .xd file is not a local XD archive (it may be a cloud document). In Adobe XD use File → Save As… → "On your computer", then try again.',
+    )
+  }
+  onProgress?.('Unpacking…')
+  const files = await unzipAsync(data)
+  const manifest = readJson(files, 'manifest')
+  const shared = readJson(files, 'resources/graphics/graphicContent.agc')
+  const symbols = indexSymbols(
+    shared?.resources?.meta?.ux?.symbols,
+    readJson(files, 'artwork/pasteboard/graphics/graphicContent.agc'),
+  )
+
+  onProgress?.('Converting artboards…')
+  const rendered = listArtboards(files, manifest).map((e) => renderArtboard(files, e, shared, symbols))
+
+  // Prepare each referenced image once, at the largest size any artboard needs.
+  const needs = new Map<string, { w: number; h: number }>()
+  for (const a of rendered)
+    for (const [k, v] of a.imageNeeds) {
+      const p = needs.get(k)
+      needs.set(k, { w: Math.max(p?.w ?? 0, v.w), h: Math.max(p?.h ?? 0, v.h) })
+    }
+  const uris = await processImages(files, needs, imageScale, onProgress)
+
+  const artboards: XdArtboard[] = rendered.map((a) => ({
+    id: a.id,
+    name: a.name,
+    width: a.width,
+    height: a.height,
+    skipped: a.skipped,
+    template: a.svg,
+    svg: fillImages(a.svg, uris),
+  }))
+
+  const previewKey = Object.keys(files).find((k) => /(^|\/)(preview|thumbnail)\.(png|jpe?g)$/i.test(k))
+  const previewUrl = previewKey
+    ? URL.createObjectURL(new Blob([files[previewKey] as BlobPart], { type: sniffMime(files[previewKey]) ?? 'image/png' }))
+    : null
+
+  if (artboards.length === 0 && !previewUrl) {
+    throw new Error('No artboards found in this XD file.')
+  }
+  return {
+    name: file.name.replace(/\.xd$/i, ''),
+    artboards,
+    previewUrl,
+    imageScale,
+    source: { file, imageNeeds: needs },
+  }
+}
+
+/** Re-process only the embedded images at a new scale; everything else is reused. */
+export async function setXdImageScale(
+  doc: XdDocument,
+  imageScale: number,
+  onProgress?: (message: string) => void,
+): Promise<XdDocument> {
+  const { file, imageNeeds } = doc.source
+  let uris = new Map<string, string>()
+  if (imageNeeds.size) {
+    onProgress?.('Unpacking images…')
+    const wanted = new Set([...imageNeeds.keys()].map((k) => `resources/${k}`))
+    const files = await unzipAsync(new Uint8Array(await file.arrayBuffer()), (name) => wanted.has(name))
+    uris = await processImages(files, imageNeeds, imageScale, onProgress)
+  }
+  return {
+    ...doc,
+    imageScale,
+    artboards: doc.artboards.map((a) => ({ ...a, svg: fillImages(a.template, uris) })),
+  }
+}
+
+async function processImages(
+  files: Unzipped,
+  needs: Map<string, { w: number; h: number }>,
+  scale: number,
+  onProgress?: (message: string) => void,
+): Promise<Map<string, string>> {
+  const uris = new Map<string, string>()
+  let done = 0
+  for (const [key, size] of needs) {
+    onProgress?.(`Processing images ${++done}/${needs.size}…`)
+    const uri = await imageDataUri(files[`resources/${key}`], size, scale)
+    if (uri) uris.set(key, uri)
+  }
+  return uris
+}
+
+function fillImages(template: string, uris: Map<string, string>): string {
+  return template.replace(/__XDIMG_([\w.-]+)__/g, (_, k: string) => uris.get(k) ?? '')
+}
+
+/**
+ * Data URI for an embedded image, downscaled so it still covers its largest
+ * on-artboard box at `scale`× (never upscaled). Opaque images become JPEG,
+ * images with transparency stay PNG — both formats jsPDF can embed.
+ */
+async function imageDataUri(
+  bytes: Uint8Array | undefined,
+  box: { w: number; h: number },
+  scale: number,
+): Promise<string | null> {
+  if (!bytes) return null
+  const mime = sniffMime(bytes)
+  if (!mime || mime === 'image/svg+xml') return null
+  const original = `data:${mime};base64,${toBase64(bytes)}`
+  if (!scale || typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') return original
+
+  let bmp: ImageBitmap | null = null
+  try {
+    const blob = new Blob([bytes as BlobPart], { type: mime })
+    bmp = await createImageBitmap(blob)
+    const { width: iw, height: ih } = bmp
+    // "cover" fit: the image is scaled so both box dimensions are filled.
+    const s = Math.max(box.w / iw, box.h / ih) * scale
+    const keepOriginal = !(s > 0) || s >= 0.9 // within 10%: not worth re-encoding
+    if (keepOriginal && (mime === 'image/png' || mime === 'image/jpeg')) return original
+    const w = Math.max(1, Math.round(iw * Math.min(1, s || 1)))
+    const h = Math.max(1, Math.round(ih * Math.min(1, s || 1)))
+    const canvas = new OffscreenCanvas(w, h)
+    const g = canvas.getContext('2d')
+    if (!g) return original
+    g.imageSmoothingQuality = 'high'
+    g.drawImage(bmp, 0, 0, w, h)
+    const px = g.getImageData(0, 0, w, h).data
+    let opaque = true
+    for (let i = 3; i < px.length; i += 4) {
+      if (px[i] < 255) {
+        opaque = false
+        break
+      }
+    }
+    const out = await canvas.convertToBlob(opaque ? { type: 'image/jpeg', quality: 0.88 } : { type: 'image/png' })
+    const outBytes = new Uint8Array(await out.arrayBuffer())
+    return outBytes.length < bytes.length ? `data:${out.type};base64,${toBase64(outBytes)}` : original
+  } catch {
+    return original
+  } finally {
+    bmp?.close()
+  }
+}
+
+/** Display variant: drop fixed size so <img> scales from the viewBox. */
+export function toDisplaySvg(svg: string): string {
+  return svg.replace(/^<svg([^>]*?) width="[^"]*" height="[^"]*"/, '<svg$1')
+}

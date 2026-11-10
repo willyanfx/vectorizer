@@ -6,7 +6,7 @@ interface Props {
   disabled?: boolean
 }
 
-const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/bmp'
+const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/bmp,.xd'
 
 export function DropZone({ onFile, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -15,7 +15,9 @@ export function DropZone({ onFile, disabled }: Props) {
   const handleFiles = useCallback(
     (files: FileList | null) => {
       if (!files || files.length === 0) return
-      const file = Array.from(files).find((f) => f.type.startsWith('image/'))
+      const file = Array.from(files).find(
+        (f) => f.type.startsWith('image/') || /\.xd$/i.test(f.name),
+      )
       if (file) onFile(file)
     },
     [onFile],
@@ -40,7 +42,7 @@ export function DropZone({ onFile, disabled }: Props) {
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && !disabled) inputRef.current?.click()
       }}
-      aria-label="Upload an image to vectorize"
+      aria-label="Upload an image to vectorize, or an Adobe XD file to export"
     >
       <input
         ref={inputRef}
@@ -56,7 +58,7 @@ export function DropZone({ onFile, disabled }: Props) {
         />
       </svg>
       <p className={styles.title}>Drop an image, or click to browse</p>
-      <p className={styles.hint}>PNG · JPG · WebP · GIF · BMP</p>
+      <p className={styles.hint}>PNG · JPG · WebP · GIF · BMP · Adobe XD</p>
     </div>
   )
 }
