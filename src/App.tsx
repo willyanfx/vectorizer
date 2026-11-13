@@ -3,12 +3,22 @@ import { DropZone } from './components/DropZone'
 import { ParamsPanel } from './components/ParamsPanel'
 import { OptimizePanel } from './components/OptimizePanel'
 import { VectorToggles } from './components/VectorToggles'
-import { PreviewPane } from './components/PreviewPane'
+import { PreviewPane, type CanvasPicker } from './components/PreviewPane'
 import { StatusBar } from './components/StatusBar'
 import { LayersPanel, type AiStatus } from './components/LayersPanel'
 import { Landing } from './components/Landing'
 import { XdPanel } from './components/XdPanel'
-import { composeArtboard, isXdFile, parseXd, setXdImageScale, toDisplaySvg, type XdDocument } from './lib/xd'
+import {
+  composeArtboardWithHit,
+  isXdFile,
+  layerParents,
+  parseXd,
+  pickLayer,
+  setXdImageScale,
+  toDisplaySvg,
+  toggleLayer,
+  type XdDocument,
+} from './lib/xd'
 import { useTracer } from './hooks/useTracer'
 import { useDebounce } from './hooks/useDebounce'
 import { useOptimize } from './hooks/useOptimize'
@@ -51,6 +61,8 @@ export default function App() {
   const [xdImageBusy, setXdImageBusy] = useState<string | null>(null)
   const [xdLayerSel, setXdLayerSel] = useState<Set<string>>(new Set())
   const [xdHidden, setXdHidden] = useState<Map<string, Set<string>>>(new Map())
+  /** Preview only the selected layers (cropped, as exported) instead of the whole artboard. */
+  const [xdIsolate, setXdIsolate] = useState(false)
 
   // background + export layer state
   const [detectedBg, setDetectedBg] = useState<{ file: File; color: string | null } | null>(null)
@@ -88,6 +100,7 @@ export default function App() {
       setXdCurrent(0)
       setXdLayerSel(new Set())
       setXdHidden(new Map())
+      setXdIsolate(false)
       setXdSelected(new Set(doc.artboards.map((_, i) => i)))
       setXdStatus({ loading: null, error: null })
     } catch (e) {
@@ -136,15 +149,36 @@ export default function App() {
   }, [xd, loadFile])
 
   const xdBoard = xd?.artboards[xdCurrent] ?? null
-  const xdDisplaySvg = useMemo(() => {
+  const xdIsolated = xdIsolate && xdLayerSel.size > 0
+  const xdOnly = xdIsolated ? xdLayerSel : undefined
+  const xdView = useMemo(() => {
     if (!xd || !xdBoard) return null
     try {
-      const { svg } = composeArtboard(xd, xdBoard, { hidden: xdHidden.get(xdBoard.id), only: xdLayerSel })
-      return svg ? toDisplaySvg(svg) : null
+      const c = composeArtboardWithHit(xd, xdBoard, {
+        hidden: xdHidden.get(xdBoard.id),
+        only: xdOnly,
+      })
+      return c.svg ? { ...c, svg: toDisplaySvg(c.svg) } : null
     } catch {
-      return toDisplaySvg(xdBoard.svg)
+      return { svg: toDisplaySvg(xdBoard.svg), hit: '', width: xdBoard.width, height: xdBoard.height }
     }
-  }, [xd, xdBoard, xdHidden, xdLayerSel])
+  }, [xd, xdBoard, xdHidden, xdOnly])
+
+  const xdParents = useMemo(() => (xdBoard ? layerParents(xdBoard.layers) : null), [xdBoard])
+  const xdPicker = useMemo<CanvasPicker | undefined>(() => {
+    if (!xdView?.hit || !xdParents) return undefined
+    return {
+      hitSvg: xdView.hit,
+      selected: xdLayerSel,
+      resolve: (chain, how) => pickLayer(chain, xdLayerSel, xdParents, how),
+      onPick: (key, additive) => {
+        if (additive && key) setXdLayerSel(toggleLayer(xdLayerSel, key, xdParents))
+        else if (!additive) setXdLayerSel(key ? new Set([key]) : new Set())
+      },
+    }
+  }, [xdView, xdParents, xdLayerSel])
+  // Big artboards (long web pages) need far more than 8× to reach 1:1.
+  const xdMaxZoom = xdBoard ? Math.max(8, Math.max(xdBoard.width, xdBoard.height) / 200) : 8
 
   const debouncedParams = useDebounce(params, 300)
   const debouncedPre = useDebounce(preprocess, 300)
@@ -327,6 +361,8 @@ export default function App() {
               onLayerSel={setXdLayerSel}
               hidden={xdHidden}
               onHidden={setXdHidden}
+              isolate={xdIsolate}
+              onIsolate={setXdIsolate}
             />
           ) : !hasImage ? (
             <>
@@ -395,13 +431,18 @@ export default function App() {
         <section className={styles.preview}>
           {hasXd ? (
             <PreviewPane
+              key={xdBoard?.id}
               originalUrl={null}
-              svg={xdDisplaySvg}
+              svg={xdView?.svg ?? null}
               busy={false}
               viewOptions={viewOptions}
               background={background}
               customBg={customBg}
               passthrough
+              // Isolated, the canvas shows only the selection, so there is nothing new to click.
+              picker={xdIsolated ? undefined : xdPicker}
+              artSize={xdView ?? undefined}
+              maxZoom={xdMaxZoom}
             />
           ) : !hasImage ? (
             <Landing />

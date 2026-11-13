@@ -21,6 +21,9 @@ interface Props {
   /** Hidden layer keys per artboard id. */
   hidden: Map<string, Set<string>>
   onHidden: (m: Map<string, Set<string>>) => void
+  /** Preview only the selected layers. */
+  isolate: boolean
+  onIsolate: (v: boolean) => void
 }
 
 const NONE = new Set<string>()
@@ -44,6 +47,8 @@ export function XdPanel({
   onLayerSel,
   hidden,
   onHidden,
+  isolate,
+  onIsolate,
 }: Props) {
   const [busy, setBusy] = useState<null | 'pdf' | 'zip' | 'layers-pdf' | 'layers-svg'>(null)
   const [error, setError] = useState<string | null>(null)
@@ -184,9 +189,12 @@ export function XdPanel({
               {layerSel.size > 0 ? (
                 <div className={styles.selection}>
                   <p className={styles.note}>
-                    {layerSel.size} layer{layerSel.size === 1 ? '' : 's'} selected · the preview shows exactly what
-                    will be exported.
+                    {layerSel.size} layer{layerSel.size === 1 ? '' : 's'} selected · Esc to clear.
                   </p>
+                  <label className={styles.check}>
+                    <input type="checkbox" checked={isolate} onChange={(e) => onIsolate(e.target.checked)} />
+                    Preview only the selection, as exported
+                  </label>
                   {layerSel.size > 1 && (
                     <label className={styles.check}>
                       <input type="checkbox" checked={perLayer} onChange={(e) => setPerLayer(e.target.checked)} />
@@ -212,7 +220,8 @@ export function XdPanel({
                 </div>
               ) : (
                 <p className={styles.note}>
-                  Tick layers to export just those items, or use the eye to leave layers out of every export.
+                  Click items on the canvas (or tick layers) to export just those. Shift-click adds, double-click
+                  goes into a group, ⌘-click picks the innermost layer. The eye leaves a layer out of every export.
                 </p>
               )}
             </div>

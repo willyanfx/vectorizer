@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { walkLayers, type XdLayer } from '../lib/xd'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { layerParents, walkLayers, type XdLayer } from '../lib/xd'
 import styles from './XdLayerTree.module.css'
 
 interface Props {
@@ -14,9 +14,11 @@ interface Props {
 export function XdLayerTree({ layers, selected, onSelected, hidden, onHidden }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
+  const treeRef = useRef<HTMLUListElement>(null)
 
-  const { descendants, matches } = useMemo(() => {
+  const { descendants, parents, all } = useMemo(() => {
     const descendants = new Map<string, string[]>()
+    const parents = layerParents(layers)
     const all: XdLayer[] = []
     walkLayers(layers, (l) => {
       all.push(l)
@@ -24,9 +26,28 @@ export function XdLayerTree({ layers, selected, onSelected, hidden, onHidden }: 
       walkLayers(l.children, (c) => keys.push(c.key))
       descendants.set(l.key, keys)
     })
+    return { descendants, parents, all }
+  }, [layers])
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return { descendants, matches: q ? all.filter((l) => l.name.toLowerCase().includes(q)).slice(0, 200) : null }
-  }, [layers, query])
+    return q ? all.filter((l) => l.name.toLowerCase().includes(q)).slice(0, 200) : null
+  }, [all, query])
+
+  // Layers picked on the canvas may sit deep inside collapsed groups: open
+  // their ancestors (adjusting state while rendering, not in an effect).
+  const [revealed, setRevealed] = useState(selected)
+  if (revealed !== selected) {
+    setRevealed(selected)
+    const open: string[] = []
+    for (const k of selected) for (let p = parents.get(k); p; p = parents.get(p)) if (!expanded.has(p)) open.push(p)
+    if (open.length) setExpanded(new Set([...expanded, ...open]))
+  }
+  // …and bring the selection into view.
+  useEffect(() => {
+    const first = [...selected][0]
+    if (!first) return
+    treeRef.current?.querySelector(`[data-key="${CSS.escape(first)}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [selected])
 
   const toggleExpanded = (k: string) => {
     const next = new Set(expanded)
@@ -61,6 +82,7 @@ export function XdLayerTree({ layers, selected, onSelected, hidden, onHidden }: 
     return (
       <li key={l.key} role="treeitem" aria-expanded={hasKids ? open : undefined} aria-selected={isSel}>
         <div
+          data-key={l.key}
           className={`${styles.row} ${isSel ? styles.selected : ''} ${inSel ? styles.inSelection : ''} ${isHidden || inHidden ? styles.hidden : ''}`}
           style={{ paddingLeft: 4 + depth * 14 }}
         >
@@ -121,7 +143,7 @@ export function XdLayerTree({ layers, selected, onSelected, hidden, onHidden }: 
         onChange={(e) => setQuery(e.target.value)}
         aria-label="Filter layers"
       />
-      <ul className={`${styles.list} ${styles.tree}`} role="tree" aria-label="Layers" aria-multiselectable>
+      <ul ref={treeRef} className={`${styles.list} ${styles.tree}`} role="tree" aria-label="Layers" aria-multiselectable>
         {matches
           ? matches.map((l) => row(l, 0, false, false, true))
           : [...layers].reverse().map((l) => row(l, 0, false, false))}

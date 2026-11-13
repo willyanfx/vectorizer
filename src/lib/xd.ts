@@ -112,7 +112,12 @@ function toBase64(bytes: Uint8Array): string {
 function color(c: Json): { value: string; alpha: number } | null {
   if (!c) return null
   const v = c.value ?? c
-  if (typeof v === 'object' && 'r' in v) {
+  // Ranged text styles store colors as one ARGB integer.
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const hex = (v >>> 0).toString(16).padStart(8, '0')
+    return { value: `#${hex.slice(2)}`, alpha: n(c.alpha, parseInt(hex.slice(0, 2), 16) / 255) }
+  }
+  if (v && typeof v === 'object' && 'r' in v) {
     const hex = [v.r, v.g, v.b]
       .map((x: number) => Math.max(0, Math.min(255, Math.round(n(x)))).toString(16).padStart(2, '0'))
       .join('')
@@ -392,26 +397,83 @@ const WEIGHTS: Array<[RegExp, number]> = [
   [/extra ?light|ultra ?light/i, 200],
   [/light/i, 300],
   [/medium/i, 500],
-  [/semi ?bold|demi ?bold/i, 600],
+  [/semi ?bold|demi ?bold|sm ?bold/i, 600],
   [/extra ?bold|ultra ?bold/i, 800],
   [/black|heavy/i, 900],
   [/bold/i, 700],
 ]
 
-function fontAttrs(font: Json): string {
+interface FontSpec {
+  family?: string
+  style?: string
+  postscriptName?: string
+  size?: number
+}
+
+function fontAttrs(font: FontSpec | null | undefined): string {
   if (!font) return ''
   let out = ''
-  if (font.family) {
-    const ps = font.postscriptName && font.postscriptName !== font.family ? `, '${font.postscriptName}'` : ''
-    out += ` font-family="${esc(`'${font.family}'${ps}, sans-serif`)}"`
-  }
+  // Most specific name first. XD families often hold many widths of one weight
+  // ("Sharp Grotesk Bold" 05–25), so the bare family can resolve to the wrong
+  // width; the PostScript name ("SharpGroteskBold19") picks the exact face.
+  const names: string[] = []
+  if (font.postscriptName) names.push(font.postscriptName)
+  if (font.family && / /.test(font.family) && font.style && /^\d+$/.test(font.style)) names.push(`${font.family} ${font.style}`)
+  if (font.family) names.push(font.family)
+  const unique = [...new Set(names)]
+  if (unique.length) out += ` font-family="${esc(`${unique.map((f) => `'${f.replace(/'/g, '')}'`).join(', ')}, sans-serif`)}"`
   if (font.size) out += ` font-size="${fmt(n(font.size))}"`
   // XD often encodes weight in the family ("Sharp Grotesk Bold") with a numeric style ("19").
-  const st = `${font.family ?? ''} ${font.style ?? ''}`
+  const st = `${font.family ?? ''} ${font.style ?? ''} ${font.postscriptName ?? ''}`
   const w = WEIGHTS.find(([re]) => re.test(st))
   if (w) out += ` font-weight="${w[1]}"`
   if (/italic|oblique/i.test(st)) out += ' font-style="italic"'
   return out
+}
+
+function fillAttr(c: { value: string; alpha: number } | null): string {
+  return c ? ` fill="${c.value}"${c.alpha < 1 ? ` fill-opacity="${fmt(c.alpha)}"` : ''}` : ''
+}
+
+function applyCase(s: string, mode: unknown): string {
+  switch (mode) {
+    case 'uppercase':
+      return s.toUpperCase()
+    case 'lowercase':
+      return s.toLowerCase()
+    case 'titlecase':
+      return s.replace(/(^|\s)(\S)/g, (_, a: string, b: string) => a + b.toUpperCase())
+    default:
+      return s
+  }
+}
+
+/**
+ * x of the alignment anchor for centered / right-aligned text, or null to
+ * place each line at XD's measured left edge. Anchoring keeps the text where
+ * it belongs even when the font renders a little wider or narrower than in XD.
+ *
+ * Where XD puts the origin, by text frame type:
+ *   positioned (point text)  origin on the anchor, line x relative to it
+ *   area (fixed box)         origin at the box's left, line x from that edge
+ *   autoHeight               origin at the box's left, but centered lines'
+ *                            x is measured from the box's centre
+ */
+function textAnchorX(t: Json, align: unknown, xs: number[]): number | null {
+  const type = t?.frame?.type
+  const w = n(t?.frame?.width)
+  const all = (ok: (x: number) => boolean) => xs.every(ok)
+  if (align === 'center') {
+    if (type === 'area') return w && all((x) => x >= -1 && x <= w / 2 + 1) ? w / 2 : null
+    if (type === 'autoHeight') return w && all((x) => x <= 1 && x >= -w / 2 - 1) ? w / 2 : null
+    return all((x) => x <= 1) ? 0 : null
+  }
+  if (align === 'right') {
+    if (type === 'area') return w && all((x) => x >= -1 && x <= w + 1) ? w : null
+    if (type === 'autoHeight') return null // no samples seen; keep XD's measured positions
+    return all((x) => x <= 1) ? 0 : null
+  }
+  return null
 }
 
 function renderText(ctx: Ctx, node: Json): string {
@@ -420,10 +482,11 @@ function renderText(ctx: Ctx, node: Json): string {
   const style = node.style ?? {}
   const attrs = nodeAttrs(ctx, node)
   const base = fontAttrs(style.font) + paintAttrs(ctx, style, true)
+  const fontSize = n(style.font?.size, 16)
   const ls = n(style.textAttributes?.letterSpacing)
-  const spacing = ls ? ` letter-spacing="${fmt((ls / 1000) * n(style.font?.size, 16))}"` : ''
+  const spacing = ls ? ` letter-spacing="${fmt((ls / 1000) * fontSize)}"` : ''
 
-  // Ranged styles: [{length, fontFamily, fontSize, fontStyle, fill}] covering rawText.
+  // Ranged styles: [{length, fontFamily, fontSize, fill, textTransform…}] covering rawText.
   const ranges: Array<{ from: number; to: number; s: Json }> = []
   let pos = 0
   for (const r of node.meta?.ux?.rangedStyles ?? []) {
@@ -431,50 +494,83 @@ function renderText(ctx: Ctx, node: Json): string {
     ranges.push({ from: pos, to: pos + len, s: r })
     pos += len
   }
+  // Ranged styles may stop short of the end of the text; the last style carries on.
+  if (ranges.length && pos < raw.length) ranges[ranges.length - 1].to = pos = raw.length
+  // Text as displayed (XD's "uppercase" etc. is a style, rawText keeps the
+  // typed case). Transformed per range so title case sees whole words.
+  let shown = raw
+  if (ranges.some((r) => r.s.textTransform && r.s.textTransform !== 'none')) {
+    const cased = ranges.map((r) => applyCase(raw.slice(r.from, r.to), r.s.textTransform)).join('') + raw.slice(pos)
+    if (cased.length === raw.length) shown = cased // some case maps change length (ß → SS)
+  }
+  const caseAt = (i: number) => ranges.find((r) => i >= r.from && i < r.to)?.s.textTransform
+  const slice = (from: number, to: number) =>
+    shown !== raw || !ranges.length ? shown.slice(from, to) : applyCase(raw.slice(from, to), caseAt(from))
+
   const rangeAttrs = (s: Json) => {
-    let a = fontAttrs({ family: s.fontFamily, size: s.fontSize, style: s.fontStyle })
-    const c = color(s.fill)
-    if (c) a += ` fill="${c.value}"${c.alpha < 1 ? ` fill-opacity="${fmt(c.alpha)}"` : ''}`
+    let a = fontAttrs({ family: s.fontFamily, size: s.fontSize, style: s.fontStyle, postscriptName: s.postscriptName })
+    a += fillAttr(color(s.fill))
+    const cs = n(s.charSpacing)
+    if (cs !== ls) a += ` letter-spacing="${fmt((cs / 1000) * n(s.fontSize, fontSize))}"`
+    const deco = [s.underline && 'underline', s.strikethrough && 'line-through'].filter(Boolean).join(' ')
+    if (deco) a += ` text-decoration="${deco}"`
     return a
   }
 
   const segment = (from: number, to: number) => {
-    if (ranges.length <= 1) return esc(raw.slice(from, to))
+    if (ranges.length <= 1) return esc(slice(from, to))
     return ranges
       .filter((r) => r.to > from && r.from < to)
-      .map((r) => `<tspan${rangeAttrs(r.s)}>${esc(raw.slice(Math.max(from, r.from), Math.min(to, r.to)))}</tspan>`)
+      .map((r) => `<tspan${rangeAttrs(r.s)}>${esc(slice(Math.max(from, r.from), Math.min(to, r.to)))}</tspan>`)
       .join('')
   }
 
+  // Segments can override the node style (e.g. a bold first line).
+  const segAttrs = (seg: Json) => {
+    if (!seg.style) return ''
+    return fontAttrs(seg.style.font) + fillAttr(color(seg.style.fill?.color))
+  }
+
   let body = ''
+  let anchor = ''
   const paragraphs: Json[] = t?.paragraphs ?? []
   if (paragraphs.length) {
-    for (const p of paragraphs) {
-      for (const line of p.lines ?? []) {
-        for (const seg of line ?? []) {
-          const from = n(seg.from), to = n(seg.to, raw.length)
-          if (to <= from) continue
-          // Segments can override the node style (e.g. a bold first line).
-          let segAttrs = ''
-          if (seg.style) {
-            segAttrs = fontAttrs(seg.style.font)
-            const c = color(seg.style.fill?.color)
-            if (c) segAttrs += ` fill="${c.value}"${c.alpha < 1 ? ` fill-opacity="${fmt(c.alpha)}"` : ''}`
-          }
-          body += `<tspan x="${fmt(n(seg.x))}" y="${fmt(n(seg.y))}"${segAttrs}>${segment(from, to)}</tspan>`
-        }
+    const lines: Json[][] = paragraphs.flatMap((p) => (p.lines ?? []) as Json[][]).map((l) => (l ?? []) as Json[])
+    const align = style.textAttributes?.paragraphAlign
+    const ax = textAnchorX(t, align, lines.flatMap((l) => l.map((seg) => n(seg.x))))
+    if (ax != null) anchor = ` text-anchor="${align === 'center' ? 'middle' : 'end'}"`
+    for (const line of lines) {
+      const segs = line
+        .map((seg) => ({ seg, from: n(seg.from), to: n(seg.to, raw.length) }))
+        .filter((s) => s.to > s.from)
+      if (!segs.length) continue
+      if (ax == null) {
+        for (const { seg, from, to } of segs)
+          body += `<tspan x="${fmt(n(seg.x))}" y="${fmt(n(seg.y))}"${segAttrs(seg)}>${segment(from, to)}</tspan>`
+        continue
       }
+      // Anchored line: trailing spaces would shift it off-center.
+      const last = segs[segs.length - 1]
+      while (last.to > last.from && /\s/.test(raw[last.to - 1])) last.to--
+      const inner = segs
+        .filter((s) => s.to > s.from)
+        .map(({ seg, from, to }) => {
+          const a = segAttrs(seg)
+          return a ? `<tspan${a}>${segment(from, to)}</tspan>` : segment(from, to)
+        })
+        .join('')
+      body += `<tspan x="${fmt(ax)}" y="${fmt(n(segs[0].seg.y))}">${inner}</tspan>`
     }
   } else if (raw) {
     // No layout info: fall back to one line per hard break.
-    const lh = n(style.textAttributes?.lineHeight, n(style.font?.size, 16) * 1.2)
-    body = raw
-      .split(/\r?\n/)
+    const lh = n(style.textAttributes?.lineHeight, fontSize * 1.2)
+    body = shown
+      .split(/\r\n?|\n/)
       .map((l, i) => `<tspan x="0" y="${fmt(i * lh)}">${esc(l)}</tspan>`)
       .join('')
   }
   if (!body) return ''
-  return `<g${attrs}><text xml:space="preserve"${base}${spacing}>${body}</text></g>`
+  return `<g${attrs}><text xml:space="preserve"${base}${spacing}${anchor}>${body}</text></g>`
 }
 
 /* ----------------------------------------------------------------- traverse */
@@ -858,8 +954,12 @@ async function processImages(
   return uris
 }
 
-function fillImages(template: string, uris: Map<string, string>): string {
-  return template.replace(/__XDIMG_([\w.-]+)__/g, (_, k: string) => uris.get(k) ?? '')
+// 1×1 transparent PNG: keeps <image> boxes clickable without the image data.
+const BLANK_IMAGE =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
+function fillImages(template: string, uris: Map<string, string> | 'blank'): string {
+  return template.replace(/__XDIMG_([\w.-]+)__/g, (_, k: string) => (uris === 'blank' ? BLANK_IMAGE : (uris.get(k) ?? '')))
 }
 
 /**
@@ -934,12 +1034,35 @@ export interface ComposedSvg {
 
 /**
  * Artboard SVG with hidden layers removed, or only the chosen layers, cropped
- * to their visible bounds. Works on the image-less template, so it stays fast
- * even when the artboard embeds tens of MB of images. Browser only.
+ * to their visible bounds. Browser only.
  */
 export function composeArtboard(doc: XdDocument, board: XdArtboard, opts: ComposeOptions = {}): ComposedSvg {
+  if (!opts.hidden?.size && !opts.only?.size) return { svg: board.svg, width: board.width, height: board.height }
+  const t = composeTemplate(board, opts)
+  return { ...t, svg: t.svg && fillImages(t.svg, doc.imageUris) }
+}
+
+/**
+ * Like composeArtboard, but in two flavours from one pass: `svg` with the
+ * images, and `hit` with every image replaced by a transparent pixel — same
+ * geometry and layer ids, cheap enough to put in the DOM for hit testing.
+ */
+export function composeArtboardWithHit(
+  doc: XdDocument,
+  board: XdArtboard,
+  opts: ComposeOptions = {},
+): ComposedSvg & { hit: string } {
+  const t = composeTemplate(board, opts)
+  return { ...t, svg: t.svg && fillImages(t.svg, doc.imageUris), hit: t.svg && fillImages(t.svg, 'blank') }
+}
+
+/**
+ * composeArtboard on the image-less template, so it stays fast even when the
+ * artboard embeds tens of MB of images. `svg` still holds image placeholders.
+ */
+function composeTemplate(board: XdArtboard, opts: ComposeOptions): ComposedSvg {
   const { hidden, only } = opts
-  const plain = { svg: board.svg, width: board.width, height: board.height }
+  const plain = { svg: board.template, width: board.width, height: board.height }
   if (!hidden?.size && !only?.size) return plain
 
   const parsed = new DOMParser().parseFromString(board.template, 'image/svg+xml')
@@ -983,8 +1106,7 @@ export function composeArtboard(doc: XdDocument, board: XdArtboard, opts: Compos
     root.setAttribute('height', fmt(h))
   }
 
-  const svg = fillImages(new XMLSerializer().serializeToString(root), doc.imageUris)
-  return { svg, width, height }
+  return { svg: new XMLSerializer().serializeToString(root), width, height }
 }
 
 /** Union of the elements' visible boxes (clip paths applied, strokes padded), in artboard units. */
@@ -998,18 +1120,7 @@ function measureLayers(svg: Element, ids: string[]): [number, number, number, nu
     for (const id of ids) {
       const el = live.querySelector(`[id="${CSS.escape(id)}"]`)
       if (!el) continue
-      let r = rectOf(el)
-      // Masks: intersect with each ancestor's clip region.
-      for (let p: Element | null = el; p && p !== live; p = p.parentElement) {
-        const m = /url\(#([^)]+)\)/.exec(p.getAttribute('clip-path') ?? '')
-        const clip = m && live.querySelector(`[id="${CSS.escape(m[1])}"]`)
-        if (!clip) continue
-        const probe = document.createElementNS(SVG_NS, 'g')
-        for (const c of clip.children) probe.appendChild(c.cloneNode(true))
-        p.appendChild(probe)
-        r = intersect(r, rectOf(probe))
-        probe.remove()
-      }
+      const r = visibleRect(live, el)
       if (!r) continue
       let pad = 0
       for (const s of [el, ...el.querySelectorAll('[stroke-width]')]) {
@@ -1034,7 +1145,27 @@ function measureLayers(svg: Element, ids: string[]): [number, number, number, nu
   }
 }
 
-type Rect = { left: number; top: number; right: number; bottom: number }
+export type Rect = { left: number; top: number; right: number; bottom: number }
+
+/**
+ * Screen box of a rendered element, cut down by the clip paths (masks) of it
+ * and its ancestors, so a masked photo reports the visible window rather than
+ * the whole image. `root` must be a live, laid-out <svg>.
+ */
+export function visibleRect(root: Element, el: Element): Rect | null {
+  let r = rectOf(el)
+  for (let p: Element | null = el; p && p !== root; p = p.parentElement) {
+    const m = /url\(#([^)]+)\)/.exec(p.getAttribute('clip-path') ?? '')
+    const clip = m && root.querySelector(`[id="${CSS.escape(m[1])}"]`)
+    if (!clip) continue
+    const probe = document.createElementNS(SVG_NS, 'g')
+    for (const c of clip.children) probe.appendChild(c.cloneNode(true))
+    p.appendChild(probe)
+    r = intersect(r, rectOf(probe))
+    probe.remove()
+  }
+  return r
+}
 
 function rectOf(el: Element): Rect | null {
   const r = el.getBoundingClientRect()
@@ -1059,4 +1190,63 @@ export function walkLayers(layers: XdLayer[], fn: (l: XdLayer) => void) {
     fn(l)
     walkLayers(l.children, fn)
   }
+}
+
+/** Layer key → parent layer key (null at the top level). */
+export function layerParents(layers: XdLayer[]): Map<string, string | null> {
+  const map = new Map<string, string | null>()
+  const walk = (list: XdLayer[], parent: string | null) => {
+    for (const l of list) {
+      map.set(l.key, parent)
+      walk(l.children, l.key)
+    }
+  }
+  walk(layers, null)
+  return map
+}
+
+function isAncestor(parents: Map<string, string | null>, a: string, b: string): boolean {
+  for (let p = parents.get(b); p; p = parents.get(p)) if (p === a) return true
+  return false
+}
+
+/**
+ * Which layer a click on the canvas selects, given the layers under the
+ * pointer (outermost first). Like Figma: a click picks the top-level layer,
+ * or a sibling of the current selection once you have gone into a group;
+ * `drill` (double-click) goes one level deeper; `deep` (⌘-click) picks the
+ * innermost layer.
+ */
+export function pickLayer(
+  chain: string[],
+  selected: ReadonlySet<string>,
+  parents: Map<string, string | null>,
+  how: { deep?: boolean; drill?: boolean } = {},
+): string | null {
+  if (!chain.length) return null
+  if (how.deep) return chain[chain.length - 1]
+  let depth = 0
+  for (const s of selected) {
+    const i = chain.indexOf(s)
+    if (i >= 0) {
+      depth = Math.max(depth, how.drill ? i + 1 : i)
+      continue
+    }
+    const p = parents.get(s)
+    const j = p ? chain.indexOf(p) : -1
+    if (j >= 0) depth = Math.max(depth, j + 1)
+  }
+  return chain[Math.min(depth, chain.length - 1)]
+}
+
+/** Shift-click: toggle a layer, dropping any of its ancestors or descendants. */
+export function toggleLayer(
+  selected: ReadonlySet<string>,
+  key: string,
+  parents: Map<string, string | null>,
+): Set<string> {
+  if (selected.has(key)) return new Set([...selected].filter((s) => s !== key))
+  const next = new Set([...selected].filter((s) => !isAncestor(parents, s, key) && !isAncestor(parents, key, s)))
+  next.add(key)
+  return next
 }
