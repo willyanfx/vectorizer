@@ -1,3 +1,4 @@
+import { strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { isXdFile, layerParents, parseXd, pickLayer, toDisplaySvg, toggleLayer, walkLayers, type XdLayer } from '../src'
 import { ARTBOARD, basicXd } from './fixture'
@@ -43,6 +44,12 @@ describe('parseXd', () => {
   it('falls back to scanning the archive when the manifest is missing', async () => {
     const doc = await parseXd(file(basicXd({ manifest: false })))
     expect(doc.artboards.map((a) => a.id)).toEqual([ARTBOARD.id])
+  })
+
+  it('ignores previews that are not PNG/JPEG (e.g. SVG with script)', async () => {
+    const svg = strToU8('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+    const bytes = zipSync({ ...unzipSync(basicXd()), 'preview.png': svg })
+    expect((await parseXd(file(bytes))).previewUrl).toBeNull()
   })
 
   it('rejects files that are not ZIP archives (cloud documents)', async () => {

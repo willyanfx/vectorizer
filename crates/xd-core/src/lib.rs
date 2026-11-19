@@ -234,10 +234,10 @@ impl XdArchive {
             })?
             .clone();
         let bytes = self.read(&key)?;
-        Some(Preview {
-            mime: images::sniff_mime(&bytes).unwrap_or("image/png"),
-            bytes,
-        })
+        // Raster only: SVG/HTML content behind a blob URL could run script.
+        let mime =
+            images::sniff_mime(&bytes).filter(|m| matches!(*m, "image/png" | "image/jpeg"))?;
+        Some(Preview { mime, bytes })
     }
 }
 
@@ -300,7 +300,9 @@ mod tests {
             SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
         for (name, v) in files {
             w.start_file(*name, opts).unwrap();
-            w.write_all(v.to_string().as_bytes()).unwrap();
+            // Strings are written as raw text, everything else as JSON.
+            let data = v.as_str().map_or_else(|| v.to_string(), str::to_string);
+            w.write_all(data.as_bytes()).unwrap();
         }
         w.finish().unwrap().into_inner()
     }
@@ -347,6 +349,18 @@ mod tests {
         let boards = XdArchive::open(basic(false)).unwrap().artboards();
         assert_eq!(boards.len(), 1);
         assert_eq!(boards[0].name, "artboard-A1");
+    }
+
+    #[test]
+    fn ignores_non_raster_previews() {
+        let svg = Value::String("<svg><script>alert(1)</script></svg>".into());
+        let bytes = xd(&[("manifest", json!({})), ("preview.png", svg)]);
+        assert!(XdArchive::open(bytes.clone()).unwrap().preview().is_none());
+        // With no artboards and no usable preview, there is nothing to show.
+        assert!(matches!(
+            parse_xd(bytes, ParseOptions::default()),
+            Err(Error::NoArtboards)
+        ));
     }
 
     #[test]

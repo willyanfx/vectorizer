@@ -65,9 +65,12 @@ export async function parseXd(file: File, opts: ParseXdOptions = {}): Promise<Xd
   }))
 
   const previewKey = Object.keys(files).find((k) => /(^|\/)(preview|thumbnail)\.(png|jpe?g)$/i.test(k))
-  const previewUrl = previewKey
-    ? URL.createObjectURL(new Blob([files[previewKey] as BlobPart], { type: sniffMime(files[previewKey]) ?? 'image/png' }))
-    : null
+  // Raster only: a same-origin blob URL of SVG/HTML content could run script.
+  const previewMime = previewKey ? sniffMime(files[previewKey]) : null
+  const previewUrl =
+    previewKey && (previewMime === 'image/png' || previewMime === 'image/jpeg')
+      ? URL.createObjectURL(new Blob([files[previewKey] as BlobPart], { type: previewMime }))
+      : null
 
   if (artboards.length === 0 && !previewUrl) {
     throw new Error('No artboards found in this XD file.')
