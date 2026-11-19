@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { composeArtboard, walkLayers, type XdArtboard, type XdDocument } from '../lib/xd'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { composeArtboard, visibleRect, walkLayers, type XdArtboard, type XdDocument, type XdLayer } from '../lib/xd'
 import { downloadPdf, downloadSvg, downloadSvgZip, safeFileName } from '../lib/exportFiles'
 import { XdLayerTree } from './XdLayerTree'
 import styles from './XdPanel.module.css'
@@ -27,6 +27,19 @@ interface Props {
 }
 
 const NONE = new Set<string>()
+
+/**
+ * Whether a layer shows on the canvas, measured on the live hit-test SVG.
+ * Without one (e.g. while previewing only the selection) assume it does.
+ */
+function onCanvas(key: string): boolean {
+  const el = document.getElementById(key)
+  const root = el instanceof SVGElement ? el.ownerSVGElement : null
+  if (!el || !root) return true
+  const r = visibleRect(root, el)
+  const b = root.getBoundingClientRect()
+  return !!r && r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom
+}
 
 const IMAGE_SCALES: Array<{ value: number; label: string; hint: string }> = [
   { value: 1, label: '1×', hint: 'Smallest files. Images match their on-screen size.' },
@@ -59,11 +72,64 @@ export function XdPanel({
   const board = boards[current] as XdArtboard | undefined
   const boardHidden = (board && hidden.get(board.id)) ?? NONE
 
-  const names = useMemo(() => {
-    const m = new Map<string, string>()
-    if (board) walkLayers(board.layers, (l) => m.set(l.key, l.name))
+  const byKey = useMemo(() => {
+    const m = new Map<string, XdLayer>()
+    if (board) walkLayers(board.layers, (l) => m.set(l.key, l))
     return m
   }, [board])
+
+  /** Text of the selected layers (and of text inside selected groups), in layer order. */
+  const selectedText = useMemo(() => {
+    const out: Array<{ key: string; text: string }> = []
+    const collect = (l: XdLayer) => {
+      if (boardHidden.has(l.key)) return
+      const text = l.text?.trim()
+      if (text) out.push({ key: l.key, text })
+      l.children.forEach(collect)
+    }
+    if (board) walkLayers(board.layers, (l) => layerSel.has(l.key) && collect(l))
+    return out
+  }, [board, layerSel, boardHidden])
+
+  const [copied, setCopied] = useState<string | null>(null)
+  const copiedTimer = useRef(0)
+  const copyText = async () => {
+    // Skip text you can't see on the canvas: off-screen carousel slides,
+    // text masked out or past the artboard edge.
+    const lines = selectedText.filter((t) => onCanvas(t.key)).map((t) => t.text)
+    let message = 'None of the selected text is visible on the artboard.'
+    if (lines.length) {
+      try {
+        await navigator.clipboard.writeText(lines.join('\n\n'))
+        message = `Copied ${lines.length} text layer${lines.length === 1 ? '' : 's'}.`
+      } catch {
+        message = 'Couldn’t reach the clipboard.'
+      }
+    }
+    setCopied(message)
+    window.clearTimeout(copiedTimer.current)
+    copiedTimer.current = window.setTimeout(() => setCopied(null), 2000)
+  }
+  // ⌘C / Ctrl+C copies the selection's text, unless the user is copying something else.
+  const onCopyKey = useEffectEvent((e: KeyboardEvent) => {
+    if (!selectedText.length) return
+    e.preventDefault()
+    void copyText()
+  })
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'c' || e.shiftKey || e.altKey) return
+      const el = e.target as HTMLElement | null
+      if (el?.closest('input, textarea, [contenteditable="true"]')) return
+      if (window.getSelection()?.toString()) return
+      onCopyKey(e)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.clearTimeout(copiedTimer.current)
+    }
+  }, [])
 
   /** Artboard SVG with that artboard's hidden layers removed. */
   const boardSvg = (a: XdArtboard) => composeArtboard(doc, a, { hidden: hidden.get(a.id) }).svg
@@ -106,7 +172,7 @@ export function XdPanel({
       const separate = perLayer && keys.length > 1
       const items = (separate ? keys.map((k) => new Set([k])) : [layerSel])
         .map((only) => ({
-          name: only.size === 1 ? (names.get([...only][0]) ?? 'Layer') : `${board.name} - selection`,
+          name: only.size === 1 ? (byKey.get([...only][0])?.name ?? 'Layer') : `${board.name} - selection`,
           svg: composeArtboard(doc, board, { hidden: boardHidden, only }).svg,
         }))
         .filter((i) => i.svg)
@@ -188,8 +254,8 @@ export function XdPanel({
               />
               {layerSel.size > 0 ? (
                 <div className={styles.selection}>
-                  <p className={styles.note}>
-                    {layerSel.size} layer{layerSel.size === 1 ? '' : 's'} selected · Esc to clear.
+                  <p className={styles.note} role="status">
+                    {copied ?? `${layerSel.size} layer${layerSel.size === 1 ? '' : 's'} selected · Esc to clear.`}
                   </p>
                   <label className={styles.check}>
                     <input type="checkbox" checked={isolate} onChange={(e) => onIsolate(e.target.checked)} />
@@ -217,6 +283,14 @@ export function XdPanel({
                       {busy === 'layers-svg' ? 'Exporting…' : perLayer && layerSel.size > 1 ? 'SVGs (.zip)' : 'Selection SVG'}
                     </button>
                   </div>
+                  <button
+                    className={`${styles.button} ${styles.secondary}`}
+                    disabled={!selectedText.length}
+                    onClick={() => void copyText()}
+                    title={selectedText.length ? 'Copy the selected text (⌘C)' : 'The selection has no text'}
+                  >
+                    Copy text
+                  </button>
                 </div>
               ) : (
                 <p className={styles.note}>

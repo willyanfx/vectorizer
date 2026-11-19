@@ -27,6 +27,8 @@ export interface XdLayer {
   name: string
   kind: 'group' | 'shape' | 'image' | 'text' | 'component' | 'mask'
   children: XdLayer[]
+  /** Text layers: the text as displayed (XD's case styles applied). */
+  text?: string
 }
 
 export interface XdArtboard {
@@ -476,16 +478,9 @@ function textAnchorX(t: Json, align: unknown, xs: number[]): number | null {
   return null
 }
 
-function renderText(ctx: Ctx, node: Json): string {
-  const t = node.text
-  const raw: string = t?.rawText ?? ''
-  const style = node.style ?? {}
-  const attrs = nodeAttrs(ctx, node)
-  const base = fontAttrs(style.font) + paintAttrs(ctx, style, true)
-  const fontSize = n(style.font?.size, 16)
-  const ls = n(style.textAttributes?.letterSpacing)
-  const spacing = ls ? ` letter-spacing="${fmt((ls / 1000) * fontSize)}"` : ''
-
+/** A text node's ranged styles and its text as displayed. */
+function textRuns(node: Json) {
+  const raw: string = node.text?.rawText ?? ''
   // Ranged styles: [{length, fontFamily, fontSize, fill, textTransform…}] covering rawText.
   const ranges: Array<{ from: number; to: number; s: Json }> = []
   let pos = 0
@@ -503,6 +498,20 @@ function renderText(ctx: Ctx, node: Json): string {
     const cased = ranges.map((r) => applyCase(raw.slice(r.from, r.to), r.s.textTransform)).join('') + raw.slice(pos)
     if (cased.length === raw.length) shown = cased // some case maps change length (ß → SS)
   }
+  return { ranges, shown }
+}
+
+function renderText(ctx: Ctx, node: Json): string {
+  const t = node.text
+  const raw: string = t?.rawText ?? ''
+  const style = node.style ?? {}
+  const attrs = nodeAttrs(ctx, node)
+  const base = fontAttrs(style.font) + paintAttrs(ctx, style, true)
+  const fontSize = n(style.font?.size, 16)
+  const ls = n(style.textAttributes?.letterSpacing)
+  const spacing = ls ? ` letter-spacing="${fmt((ls / 1000) * fontSize)}"` : ''
+
+  const { ranges, shown } = textRuns(node)
   const caseAt = (i: number) => ranges.find((r) => i >= r.from && i < r.to)?.s.textTransform
   const slice = (from: number, to: number) =>
     shown !== raw || !ranges.length ? shown.slice(from, to) : applyCase(raw.slice(from, to), caseAt(from))
@@ -617,18 +626,25 @@ function renderNode(ctx: Ctx, node: Json, as?: Json): string {
     ctx.skipped++
     return ''
   }
-  // A childless syncRef is a linked copy of a node inside a component master.
-  if (node.type === 'syncRef' && !Array.isArray(node.group?.children)) {
-    const src = ctx.symbols.get(node.syncSourceGuid)
+  if (node.type === 'syncRef') {
+    const src = masterOf(ctx, node)
     if (!src) {
       ctx.skipped++
       return ''
     }
-    ctx.depth++
-    // The instance's own layer entry describes the master's node.
-    const out = renderNode(ctx, node.transform ? { ...src, transform: node.transform } : src, as ?? node)
-    ctx.depth--
-    return out
+    if (Array.isArray(node.group?.children)) {
+      // An instance's own copy of a master group: the children are the
+      // instance's (with overrides), everything else comes from the master.
+      node = { ...src, group: { ...src.group, children: node.group.children } }
+      if (node.visible === false) return ''
+    } else {
+      // A childless syncRef is a linked copy of a node inside a component master.
+      ctx.depth++
+      // The instance's own layer entry describes the master's node.
+      const out = renderNode(ctx, src, as ?? node)
+      ctx.depth--
+      return out
+    }
   }
 
   const kind = as ? 'component' : layerKind(node)
@@ -638,6 +654,7 @@ function renderNode(ctx: Ctx, node: Json, as?: Json): string {
     kind,
     children: [],
   }
+  if (node.type === 'text') layer.text = textRuns(node).shown
   const parent = ctx.layerList
   ctx.layerList = layer.children
   ctx.depth++
@@ -653,6 +670,40 @@ function renderNode(ctx: Ctx, node: Json, as?: Json): string {
   return `<g id="${layer.key}"${out.slice(2)}`
 }
 
+/** Instance properties layered over the master node's (transform, style, scroll viewport…). */
+function overlay(master: Json, inst: Json): Json {
+  const out: Json = { ...master }
+  for (const k of ['transform', 'visible', 'name'])
+    if (inst[k] !== undefined) out[k] = inst[k]
+  if (inst.style) out.style = { ...master.style, ...inst.style }
+  if (inst.meta?.ux) out.meta = { ...master.meta, ux: { ...master.meta?.ux, ...inst.meta.ux } }
+  return out
+}
+
+/** The master node a syncRef stands for, with the syncRef's own overrides applied. */
+function masterOf(ctx: Ctx, node: Json, hops = 0): Json | null {
+  const src = ctx.symbols.get(node.syncSourceGuid)
+  if (!src || hops > 16) return null
+  const base = src.type === 'syncRef' ? masterOf(ctx, src, hops + 1) : src
+  return base && overlay(base, node)
+}
+
+/** Scroll groups show only their viewport (XD exports the unscrolled view). */
+function scrollClip(ctx: Ctx, node: Json): string {
+  const ux = node.meta?.ux
+  const type = ux?.scrollingType
+  if (!type) return ''
+  const BIG = 1e6
+  const w = type === 'vertical' ? 0 : n(ux.viewportWidth)
+  const h = type === 'horizontal' ? 0 : n(ux.viewportHeight)
+  if (!(w > 0) && !(h > 0)) return ''
+  const id = uid(ctx, 'm')
+  const [x, cw] = w > 0 ? [0, w] : [-BIG / 2, BIG]
+  const [y, ch] = h > 0 ? [0, h] : [-BIG / 2, BIG]
+  ctx.defs.push(`<clipPath id="${id}"><rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(cw)}" height="${fmt(ch)}"/></clipPath>`)
+  return ` clip-path="url(#${id})"`
+}
+
 function renderNodeInner(ctx: Ctx, node: Json): string {
   switch (node.type) {
     case 'shape':
@@ -664,7 +715,10 @@ function renderNodeInner(ctx: Ctx, node: Json): string {
       const kids: Json[] | undefined = node.group?.children ?? node.children
       if (Array.isArray(kids)) {
         const clip = clipFor(ctx, node)
-        return `<g${nodeAttrs(ctx, node)}${clip}>${kids.map((k) => renderNode(ctx, k)).join('')}</g>`
+        const scroll = scrollClip(ctx, node)
+        let inner = kids.map((k) => renderNode(ctx, k)).join('')
+        if (scroll && clip) inner = `<g${scroll}>${inner}</g>`
+        return `<g${nodeAttrs(ctx, node)}${clip || scroll}>${inner}</g>`
       }
       if (node.shape) return renderShape(ctx, node)
       ctx.skipped++
