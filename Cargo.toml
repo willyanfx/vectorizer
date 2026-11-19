@@ -5,6 +5,8 @@ members = ["crates/xd-core", "crates/xd-wasm"]
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
+# slice::as_chunks, and the image crate's own minimum.
+rust-version = "1.88"
 license = "MIT"
 
 [profile.release]

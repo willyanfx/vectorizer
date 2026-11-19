@@ -51,8 +51,10 @@ export async function imageDataUri(
     const s = Math.max(box.w / iw, box.h / ih) * scale
     const keepOriginal = !(s > 0) || s >= 0.9 // within 10%: not worth re-encoding
     if (keepOriginal && (mime === 'image/png' || mime === 'image/jpeg')) return original
-    const w = Math.max(1, Math.round(iw * Math.min(1, s || 1)))
-    const h = Math.max(1, Math.round(ih * Math.min(1, s || 1)))
+    // No usable box size (0, negative, NaN): re-encode at full size, never shrink to 1×1.
+    const f = s > 0 ? Math.min(1, s) : 1
+    const w = Math.max(1, Math.round(iw * f))
+    const h = Math.max(1, Math.round(ih * f))
     const canvas = new OffscreenCanvas(w, h)
     const g = canvas.getContext('2d')
     if (!g) return original

@@ -4,6 +4,7 @@ description = "Read Adobe XD (.xd) archives and render artboards to SVG."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 base64 = "0.22"

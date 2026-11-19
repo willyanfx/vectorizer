@@ -93,7 +93,8 @@ fn downscale(bytes: &[u8], mime: &str, size: Size, scale: f64) -> Option<String>
     if keep_original && (mime == "image/png" || mime == "image/jpeg") {
         return None;
     }
-    let f = if s == 0.0 || s.is_nan() { 1.0 } else { s }.min(1.0);
+    // No usable box size (0, negative, NaN): re-encode at full size, never shrink to 1×1.
+    let f = if s > 0.0 { s.min(1.0) } else { 1.0 };
     let w = js::round(iw * f).max(1.0) as u32;
     let h = js::round(ih * f).max(1.0) as u32;
     let rgba = img.to_rgba8();
@@ -151,6 +152,23 @@ mod tests {
             kept.starts_with("data:image/png;base64,"),
             "already small enough → original"
         );
+        // GIF with a malformed (negative) box: full size, not shrunk to 1×1.
+        // Noisy, so a 1×1 re-encode would be smaller and win if the bug came back.
+        let noise = image::RgbImage::from_fn(64, 48, |x, y| {
+            let v = (x * 7919 + y * 104729) % 251;
+            image::Rgb([v as u8, (v * 3 % 251) as u8, (v * 7 % 251) as u8])
+        });
+        let mut gif = Vec::new();
+        image::DynamicImage::ImageRgb8(noise)
+            .write_to(&mut std::io::Cursor::new(&mut gif), image::ImageFormat::Gif)
+            .unwrap();
+        let out = image_data_uri(Some(&gif), Size { w: -10.0, h: -10.0 }, 2.0).unwrap();
+        let b64 = out.split_once("base64,").unwrap().1;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
+        let img = image::load_from_memory(&bytes).unwrap();
+        assert_eq!((img.width(), img.height()), (64, 48));
         assert_eq!(
             image_data_uri(Some(&png), Size { w: 80.0, h: 60.0 }, 0.0),
             Some(data_uri("image/png", &png))
