@@ -26,8 +26,15 @@ fn fixtures() -> PathBuf {
 fn first_diff(a: &str, b: &str) -> String {
     let i = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
     let ctx = |s: &str| {
-        let lo = s.floor_char_boundary(i.saturating_sub(60));
-        let hi = s.ceil_char_boundary((i + 60).min(s.len()));
+        // Byte window around i, widened to char boundaries.
+        let mut lo = i.saturating_sub(60).min(s.len());
+        while !s.is_char_boundary(lo) {
+            lo -= 1;
+        }
+        let mut hi = (i + 60).min(s.len());
+        while !s.is_char_boundary(hi) {
+            hi += 1;
+        }
         s[lo..hi].to_string()
     };
     format!("at byte {i}:\n  rust: …{}…\n  ts:   …{}…", ctx(a), ctx(b))
