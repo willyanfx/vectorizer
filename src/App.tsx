@@ -18,7 +18,7 @@ import {
   toDisplaySvg,
   toggleLayer,
   type XdDocument,
-} from './lib/xd'
+} from '@vector/xd'
 import { useTracer } from './hooks/useTracer'
 import { useDebounce } from './hooks/useDebounce'
 import { useOptimize } from './hooks/useOptimize'

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { layerParents, walkLayers, type XdLayer } from '../lib/xd'
+import { layerParents, walkLayers, type XdLayer } from '@vector/xd'
 import styles from './XdLayerTree.module.css'
 
 interface Props {

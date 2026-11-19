@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
-import { composeArtboard, visibleRect, walkLayers, type XdArtboard, type XdDocument, type XdLayer } from '../lib/xd'
+import { composeArtboard, visibleRect, walkLayers, type XdArtboard, type XdDocument, type XdLayer } from '@vector/xd'
 import { downloadPdf, downloadSvg, downloadSvgZip, safeFileName } from '../lib/exportFiles'
 import { XdLayerTree } from './XdLayerTree'
 import styles from './XdPanel.module.css'

@@ -3,13 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:xd": "npm test -w @vector/xd",
+    "test:xd-rust": "cargo test -p xd-core",
+    "build:xd-wasm": "wasm-pack build crates/xd-wasm --target bundler --release",
+    "test:xd-wasm": "wasm-pack build crates/xd-wasm --target nodejs --release --out-dir pkg-node && npm test -w @vector/xd"
   },
   "dependencies": {
+    "@vector/xd": "*",
     "@anthropic-ai/sdk": "^0.131.0",
     "fflate": "^0.8.3",
     "imagetracerjs": "^1.2.6",

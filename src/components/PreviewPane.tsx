@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { applyView, type BackgroundMode, type VectorViewOptions } from '../lib/vectorView'
-import { visibleRect } from '../lib/xd'
+import { visibleRect } from '@vector/xd'
 import styles from './PreviewPane.module.css'
 
 type View = 'original' | 'svg' | 'split'

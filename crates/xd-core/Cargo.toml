@@ -1,0 +1,17 @@
+[package]
+name = "xd-core"
+description = "Read Adobe XD (.xd) archives and render artboards to SVG."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+indexmap = { version = "2", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+# preserve_order: key order like JSON.parse; float_roundtrip: same doubles as JS;
+# unbounded_depth: XD scene graphs can nest past serde_json's default limit.
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "unbounded_depth"] }
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }

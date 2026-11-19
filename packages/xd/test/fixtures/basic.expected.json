@@ -1,0 +1,39 @@
+{
+  "artboards": [
+    {
+      "id": "artboard-A1",
+      "name": "Home",
+      "width": 375,
+      "height": 812,
+      "skipped": 1,
+      "template": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"375\" height=\"812\" viewBox=\"0 0 375 812\"><title>Home</title><clipPath id=\"artboard-clip\"><rect width=\"375\" height=\"812\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><rect width=\"375\" height=\"812\" fill=\"#ffffff\"/><g id=\"content\"><g id=\"xl1\" transform=\"translate(16 24)\"><rect x=\"0\" y=\"0\" width=\"343\" height=\"120\" rx=\"8\" fill=\"#ff0000\"/></g><g id=\"xl2\"><g id=\"xl3\" transform=\"translate(20 60)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"24\" font-weight=\"700\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">HELLO WORLD</tspan></text></g></g></g></g></svg>",
+      "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"375\" height=\"812\" viewBox=\"0 0 375 812\"><title>Home</title><clipPath id=\"artboard-clip\"><rect width=\"375\" height=\"812\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><rect width=\"375\" height=\"812\" fill=\"#ffffff\"/><g id=\"content\"><g id=\"xl1\" transform=\"translate(16 24)\"><rect x=\"0\" y=\"0\" width=\"343\" height=\"120\" rx=\"8\" fill=\"#ff0000\"/></g><g id=\"xl2\"><g id=\"xl3\" transform=\"translate(20 60)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"24\" font-weight=\"700\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">HELLO WORLD</tspan></text></g></g></g></g></svg>",
+      "layers": [
+        {
+          "key": "xl1",
+          "name": "Card",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl2",
+          "name": "Header",
+          "kind": "group",
+          "children": [
+            {
+              "key": "xl3",
+              "name": "Hello world",
+              "kind": "text",
+              "children": [],
+              "text": "HELLO WORLD"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "imageScale": 0,
+  "imageUris": {},
+  "imageNeeds": {},
+  "preview": null
+}

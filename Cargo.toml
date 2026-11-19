@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["crates/xd-core", "crates/xd-wasm"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[profile.release]
+opt-level = "s"
+lto = true

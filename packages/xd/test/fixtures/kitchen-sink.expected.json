@@ -1,0 +1,315 @@
+{
+  "artboards": [
+    {
+      "id": "artboard-K1",
+      "name": "Kitchen <sink> & \"co\"",
+      "width": 400,
+      "height": 900,
+      "skipped": 3,
+      "template": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"900\" viewBox=\"0 0 400 900\"><title>Kitchen &lt;sink&gt; &amp; &quot;co&quot;</title><defs><linearGradient id=\"g1\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" gradientTransform=\"matrix(2 0 0 0.5 1 0)\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"0.333\" stop-color=\"#00ff00\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient><radialGradient id=\"g2\" gradientUnits=\"userSpaceOnUse\" cx=\"25\" cy=\"25\" r=\"25\" fx=\"20\" fy=\"18\"><stop offset=\"0\" stop-color=\"#ffff00\"/><stop offset=\"1\" stop-color=\"#0000ff\" stop-opacity=\"0.3\"/></radialGradient><linearGradient id=\"g3\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"0.333\" stop-color=\"#00ff00\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient><clipPath id=\"c4\"><rect x=\"0\" y=\"0\" width=\"80\" height=\"60\" rx=\"6\"/></clipPath><clipPath id=\"c5\"><path d=\"M0 0L50 0L50 40L0 40Z\"/></clipPath><clipPath id=\"c6\"><rect x=\"320\" y=\"110\" width=\"20\" height=\"20\"/></clipPath><clipPath id=\"m7\"><ellipse cx=\"50\" cy=\"50\" rx=\"50\" ry=\"50\"/><path d=\"M0 0L10 10\"/></clipPath><filter id=\"f8\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\" color-interpolation-filters=\"sRGB\"><feDropShadow dx=\"0\" dy=\"3\" stdDeviation=\"3\" flood-color=\"#000000\" flood-opacity=\"0.16\"/><feDropShadow dx=\"1\" dy=\"1\" stdDeviation=\"0.5\" flood-color=\"#ff0000\" flood-opacity=\"1\"/><feGaussianBlur stdDeviation=\"2\"/></filter><clipPath id=\"m9\"><rect x=\"0\" y=\"0\" width=\"200\" height=\"300\"/></clipPath><clipPath id=\"m10\"><rect x=\"-500000\" y=\"0\" width=\"1000000\" height=\"120\"/></clipPath><clipPath id=\"m11\"><rect x=\"0\" y=\"-500000\" width=\"80\" height=\"1000000\"/></clipPath></defs><clipPath id=\"artboard-clip\"><rect width=\"400\" height=\"900\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><rect width=\"400\" height=\"900\" fill=\"#fafafa\" fill-opacity=\"0.5\"/><g id=\"content\"><g id=\"xl1\" transform=\"translate(10 10)\" opacity=\"0.8\" style=\"mix-blend-mode:multiply\"><path d=\"M4 0H112A8 8 0 0 1 120 8V60H30A30 30 0 0 1 0 30V4A4 4 0 0 1 4 0Z\" fill=\"#0a141e\" fill-opacity=\"0.5\" stroke=\"#ff0000\" stroke-width=\"2\" stroke-opacity=\"0.25\" stroke-linecap=\"round\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"3\" stroke-dasharray=\"4 2.5\"/></g><g id=\"xl2\" transform=\"matrix(0.707 0.707 -0.707 0.707 200 20)\"><ellipse cx=\"30\" cy=\"20\" rx=\"30\" ry=\"20\" fill=\"url(#g1)\"/></g><g id=\"xl3\" transform=\"translate(300 20)\"><circle cx=\"25\" cy=\"25\" r=\"25\" fill=\"url(#g2)\" stroke=\"url(#g3)\" stroke-width=\"1.5\"/></g><g id=\"xl4\"><line x1=\"0\" y1=\"100\" x2=\"380\" y2=\"100\" fill=\"none\" stroke=\"#c8c8c8\" stroke-width=\"1\"/></g><g id=\"xl5\" transform=\"translate(20 110)\"><polygon points=\"0,40 20,0 40,40\" fill=\"#008000\"/></g><g id=\"xl6\" transform=\"translate(80 110)\"><path d=\"M0 20A20 20 0 1 0 40 20A20 20 0 1 0 0 20ZM10 20A10 10 0 1 0 30 20A1e1 1e1 0 1 0 10 20Z\" fill-rule=\"evenodd\" fill=\"#800080\"/></g><g id=\"xl7\" transform=\"translate(140 110)\"><g clip-path=\"url(#c4)\"><image x=\"0\" y=\"0\" width=\"80\" height=\"60\" preserveAspectRatio=\"none\" xlink:href=\"__XDIMG_img1__\"/></g><rect x=\"0\" y=\"0\" width=\"80\" height=\"60\" rx=\"6\" fill=\"none\" stroke=\"#000000\" stroke-width=\"1\"/></g><g id=\"xl8\" transform=\"translate(230 110)\"><g clip-path=\"url(#c5)\"><image x=\"0\" y=\"0\" width=\"50\" height=\"40\" preserveAspectRatio=\"xMidYMid slice\" xlink:href=\"__XDIMG_img2__\"/></g><path d=\"M0 0L50 0L50 40L0 40Z\" fill=\"none\"/></g><g id=\"xl9\"><rect x=\"290\" y=\"110\" width=\"20\" height=\"20\" fill=\"none\"/></g><g id=\"xl10\"><g clip-path=\"url(#c6)\"><image x=\"320\" y=\"110\" width=\"20\" height=\"20\" preserveAspectRatio=\"xMidYMid slice\" xlink:href=\"__XDIMG_vec1__\"/></g><rect x=\"320\" y=\"110\" width=\"20\" height=\"20\" fill=\"none\"/></g><g id=\"xl12\"><path d=\"M0 200L10 210L0 220Z\" fill=\"#000000\"/></g><g id=\"xl13\" transform=\"translate(20 240)\"><text xml:space=\"preserve\" font-family=\"'SharpGroteskBold19', 'Sharp Grotesk Bold 19', 'Sharp Grotesk Bold', sans-serif\" font-size=\"18\" font-weight=\"700\" fill=\"#111111\" letter-spacing=\"0.9\" text-anchor=\"middle\"><tspan x=\"100\" y=\"20\">Centered line one</tspan><tspan x=\"100\" y=\"44\">second   </tspan></text></g><g id=\"xl14\" transform=\"translate(200 240)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" font-weight=\"500\" font-style=\"italic\" fill=\"#000000\" text-anchor=\"middle\"><tspan x=\"60\" y=\"16\">Auto center</tspan></text></g><g id=\"xl15\" transform=\"translate(380 270)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"12\" fill=\"#000000\" text-anchor=\"end\"><tspan x=\"0\" y=\"0\">Right</tspan></text></g><g id=\"xl16\" transform=\"translate(20 320)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"16\" fill=\"#000000\" letter-spacing=\"0.16\"><tspan x=\"0\" y=\"0\" font-family=\"'Inter', sans-serif\" font-weight=\"900\" fill=\"#000000\"><tspan font-family=\"'Inter', sans-serif\" font-size=\"16\" font-weight=\"800\" fill=\"#ff0000\" text-decoration=\"underline\">Bold,</tspan><tspan font-family=\"'Inter', sans-serif\" font-size=\"16\" fill=\"#ff0000\" letter-spacing=\"0.32\" text-decoration=\"line-through\"> red &amp;</tspan></tspan><tspan x=\"80\" y=\"0\"><tspan font-family=\"'Inter', sans-serif\" font-size=\"12\" fill=\"#336699\" fill-opacity=\"0.502\" letter-spacing=\"0\"> &lt;plain&gt; Text</tspan></tspan></text></g><g id=\"xl17\" transform=\"translate(20 360)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">no layout</tspan><tspan x=\"0\" y=\"14\">second</tspan><tspan x=\"0\" y=\"28\">third</tspan><tspan x=\"0\" y=\"42\">fourth</tspan></text></g><g id=\"xl18\" transform=\"translate(200 360)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">Title Case, Émigré Words</tspan></text></g><g id=\"xl19\" transform=\"translate(20 440)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">STRASSE</tspan></text></g><g id=\"xl20\" transform=\"translate(120 440)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\" fill-opacity=\"0.6\"><tspan x=\"0\" y=\"0\"><tspan>emoji </tspan><tspan font-size=\"20\">😀 </tspan></tspan><tspan x=\"0\" y=\"12\"><tspan font-size=\"20\">ok then</tspan></tspan></text></g><g id=\"xl22\" transform=\"translate(20 480)\" filter=\"url(#f8)\" clip-path=\"url(#m7)\"><g id=\"xl23\"><rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#f0f0f0\"/></g></g><g id=\"xl24\" transform=\"translate(140 480)\" clip-path=\"url(#m9)\"><g clip-path=\"url(#m10)\"><g id=\"xl25\"><rect x=\"0\" y=\"0\" width=\"200\" height=\"300\" fill=\"#0000ff\"/></g></g></g><g id=\"xl26\" transform=\"translate(20 620)\" clip-path=\"url(#m11)\"><g id=\"xl27\"><ellipse cx=\"50\" cy=\"10\" rx=\"50\" ry=\"10\" fill=\"#000000\"/></g></g><g id=\"xl28\" transform=\"matrix(0.5 0 0 0.5 200 620)\"><g id=\"xl29\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">  A text layer   whose name is much long</tspan></text></g></g><g id=\"xl30\"><g id=\"xl31\"><circle cx=\"5\" cy=\"5\" r=\"5\" fill=\"#000000\"/></g></g><g id=\"xl33\" transform=\"translate(20 700)\" opacity=\"0.9\"><g id=\"xl34\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"40\" rx=\"20\" fill=\"#0066ff\"/></g><g id=\"xl35\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" font-weight=\"600\" fill=\"#ffffff\"><tspan x=\"30\" y=\"25\">Buy now</tspan></text></g></g><g id=\"xl36\" transform=\"translate(160 700)\" opacity=\"0.5\"><path d=\"M10 0L13 7L20 7L14 12L16 20L10 15L4 20L6 12L0 7L7 7Z\" fill=\"#ffc800\"/></g><g id=\"xl37\" transform=\"translate(260 700)\" opacity=\"0.9\"><g id=\"xl38\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"40\" rx=\"20\" fill=\"#000000\"/></g><g id=\"xl39\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" fill=\"#ffffff\"><tspan x=\"0\" y=\"0\">Button</tspan></text></g></g></g></g></svg>",
+      "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"400\" height=\"900\" viewBox=\"0 0 400 900\"><title>Kitchen &lt;sink&gt; &amp; &quot;co&quot;</title><defs><linearGradient id=\"g1\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\" gradientTransform=\"matrix(2 0 0 0.5 1 0)\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"0.333\" stop-color=\"#00ff00\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient><radialGradient id=\"g2\" gradientUnits=\"userSpaceOnUse\" cx=\"25\" cy=\"25\" r=\"25\" fx=\"20\" fy=\"18\"><stop offset=\"0\" stop-color=\"#ffff00\"/><stop offset=\"1\" stop-color=\"#0000ff\" stop-opacity=\"0.3\"/></radialGradient><linearGradient id=\"g3\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#ff0000\"/><stop offset=\"0.333\" stop-color=\"#00ff00\" stop-opacity=\"0.5\"/><stop offset=\"1\" stop-color=\"#0000ff\"/></linearGradient><clipPath id=\"c4\"><rect x=\"0\" y=\"0\" width=\"80\" height=\"60\" rx=\"6\"/></clipPath><clipPath id=\"c5\"><path d=\"M0 0L50 0L50 40L0 40Z\"/></clipPath><clipPath id=\"c6\"><rect x=\"320\" y=\"110\" width=\"20\" height=\"20\"/></clipPath><clipPath id=\"m7\"><ellipse cx=\"50\" cy=\"50\" rx=\"50\" ry=\"50\"/><path d=\"M0 0L10 10\"/></clipPath><filter id=\"f8\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\" color-interpolation-filters=\"sRGB\"><feDropShadow dx=\"0\" dy=\"3\" stdDeviation=\"3\" flood-color=\"#000000\" flood-opacity=\"0.16\"/><feDropShadow dx=\"1\" dy=\"1\" stdDeviation=\"0.5\" flood-color=\"#ff0000\" flood-opacity=\"1\"/><feGaussianBlur stdDeviation=\"2\"/></filter><clipPath id=\"m9\"><rect x=\"0\" y=\"0\" width=\"200\" height=\"300\"/></clipPath><clipPath id=\"m10\"><rect x=\"-500000\" y=\"0\" width=\"1000000\" height=\"120\"/></clipPath><clipPath id=\"m11\"><rect x=\"0\" y=\"-500000\" width=\"80\" height=\"1000000\"/></clipPath></defs><clipPath id=\"artboard-clip\"><rect width=\"400\" height=\"900\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><rect width=\"400\" height=\"900\" fill=\"#fafafa\" fill-opacity=\"0.5\"/><g id=\"content\"><g id=\"xl1\" transform=\"translate(10 10)\" opacity=\"0.8\" style=\"mix-blend-mode:multiply\"><path d=\"M4 0H112A8 8 0 0 1 120 8V60H30A30 30 0 0 1 0 30V4A4 4 0 0 1 4 0Z\" fill=\"#0a141e\" fill-opacity=\"0.5\" stroke=\"#ff0000\" stroke-width=\"2\" stroke-opacity=\"0.25\" stroke-linecap=\"round\" stroke-linejoin=\"bevel\" stroke-miterlimit=\"3\" stroke-dasharray=\"4 2.5\"/></g><g id=\"xl2\" transform=\"matrix(0.707 0.707 -0.707 0.707 200 20)\"><ellipse cx=\"30\" cy=\"20\" rx=\"30\" ry=\"20\" fill=\"url(#g1)\"/></g><g id=\"xl3\" transform=\"translate(300 20)\"><circle cx=\"25\" cy=\"25\" r=\"25\" fill=\"url(#g2)\" stroke=\"url(#g3)\" stroke-width=\"1.5\"/></g><g id=\"xl4\"><line x1=\"0\" y1=\"100\" x2=\"380\" y2=\"100\" fill=\"none\" stroke=\"#c8c8c8\" stroke-width=\"1\"/></g><g id=\"xl5\" transform=\"translate(20 110)\"><polygon points=\"0,40 20,0 40,40\" fill=\"#008000\"/></g><g id=\"xl6\" transform=\"translate(80 110)\"><path d=\"M0 20A20 20 0 1 0 40 20A20 20 0 1 0 0 20ZM10 20A10 10 0 1 0 30 20A1e1 1e1 0 1 0 10 20Z\" fill-rule=\"evenodd\" fill=\"#800080\"/></g><g id=\"xl7\" transform=\"translate(140 110)\"><g clip-path=\"url(#c4)\"><image x=\"0\" y=\"0\" width=\"80\" height=\"60\" preserveAspectRatio=\"none\" xlink:href=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAMklEQVR4nBXIQREAQAgDsQpDBHJ4IqUiELGuenN5RhJbIiNyIlKz1WSaXP8wWyZjciYPd8Mb0P6EGaUAAAAASUVORK5CYII=\"/></g><rect x=\"0\" y=\"0\" width=\"80\" height=\"60\" rx=\"6\" fill=\"none\" stroke=\"#000000\" stroke-width=\"1\"/></g><g id=\"xl8\" transform=\"translate(230 110)\"><g clip-path=\"url(#c5)\"><image x=\"0\" y=\"0\" width=\"50\" height=\"40\" preserveAspectRatio=\"xMidYMid slice\" xlink:href=\"data:image/jpeg;base64,/9j/4AAQSkZJRgA=\"/></g><path d=\"M0 0L50 0L50 40L0 40Z\" fill=\"none\"/></g><g id=\"xl9\"><rect x=\"290\" y=\"110\" width=\"20\" height=\"20\" fill=\"none\"/></g><g id=\"xl10\"><g clip-path=\"url(#c6)\"><image x=\"320\" y=\"110\" width=\"20\" height=\"20\" preserveAspectRatio=\"xMidYMid slice\" xlink:href=\"\"/></g><rect x=\"320\" y=\"110\" width=\"20\" height=\"20\" fill=\"none\"/></g><g id=\"xl12\"><path d=\"M0 200L10 210L0 220Z\" fill=\"#000000\"/></g><g id=\"xl13\" transform=\"translate(20 240)\"><text xml:space=\"preserve\" font-family=\"'SharpGroteskBold19', 'Sharp Grotesk Bold 19', 'Sharp Grotesk Bold', sans-serif\" font-size=\"18\" font-weight=\"700\" fill=\"#111111\" letter-spacing=\"0.9\" text-anchor=\"middle\"><tspan x=\"100\" y=\"20\">Centered line one</tspan><tspan x=\"100\" y=\"44\">second   </tspan></text></g><g id=\"xl14\" transform=\"translate(200 240)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" font-weight=\"500\" font-style=\"italic\" fill=\"#000000\" text-anchor=\"middle\"><tspan x=\"60\" y=\"16\">Auto center</tspan></text></g><g id=\"xl15\" transform=\"translate(380 270)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"12\" fill=\"#000000\" text-anchor=\"end\"><tspan x=\"0\" y=\"0\">Right</tspan></text></g><g id=\"xl16\" transform=\"translate(20 320)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"16\" fill=\"#000000\" letter-spacing=\"0.16\"><tspan x=\"0\" y=\"0\" font-family=\"'Inter', sans-serif\" font-weight=\"900\" fill=\"#000000\"><tspan font-family=\"'Inter', sans-serif\" font-size=\"16\" font-weight=\"800\" fill=\"#ff0000\" text-decoration=\"underline\">Bold,</tspan><tspan font-family=\"'Inter', sans-serif\" font-size=\"16\" fill=\"#ff0000\" letter-spacing=\"0.32\" text-decoration=\"line-through\"> red &amp;</tspan></tspan><tspan x=\"80\" y=\"0\"><tspan font-family=\"'Inter', sans-serif\" font-size=\"12\" fill=\"#336699\" fill-opacity=\"0.502\" letter-spacing=\"0\"> &lt;plain&gt; Text</tspan></tspan></text></g><g id=\"xl17\" transform=\"translate(20 360)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">no layout</tspan><tspan x=\"0\" y=\"14\">second</tspan><tspan x=\"0\" y=\"28\">third</tspan><tspan x=\"0\" y=\"42\">fourth</tspan></text></g><g id=\"xl18\" transform=\"translate(200 360)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">Title Case, Émigré Words</tspan></text></g><g id=\"xl19\" transform=\"translate(20 440)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">STRASSE</tspan></text></g><g id=\"xl20\" transform=\"translate(120 440)\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\" fill-opacity=\"0.6\"><tspan x=\"0\" y=\"0\"><tspan>emoji </tspan><tspan font-size=\"20\">😀 </tspan></tspan><tspan x=\"0\" y=\"12\"><tspan font-size=\"20\">ok then</tspan></tspan></text></g><g id=\"xl22\" transform=\"translate(20 480)\" filter=\"url(#f8)\" clip-path=\"url(#m7)\"><g id=\"xl23\"><rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#f0f0f0\"/></g></g><g id=\"xl24\" transform=\"translate(140 480)\" clip-path=\"url(#m9)\"><g clip-path=\"url(#m10)\"><g id=\"xl25\"><rect x=\"0\" y=\"0\" width=\"200\" height=\"300\" fill=\"#0000ff\"/></g></g></g><g id=\"xl26\" transform=\"translate(20 620)\" clip-path=\"url(#m11)\"><g id=\"xl27\"><ellipse cx=\"50\" cy=\"10\" rx=\"50\" ry=\"10\" fill=\"#000000\"/></g></g><g id=\"xl28\" transform=\"matrix(0.5 0 0 0.5 200 620)\"><g id=\"xl29\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"10\" fill=\"#000000\"><tspan x=\"0\" y=\"0\">  A text layer   whose name is much long</tspan></text></g></g><g id=\"xl30\"><g id=\"xl31\"><circle cx=\"5\" cy=\"5\" r=\"5\" fill=\"#000000\"/></g></g><g id=\"xl33\" transform=\"translate(20 700)\" opacity=\"0.9\"><g id=\"xl34\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"40\" rx=\"20\" fill=\"#0066ff\"/></g><g id=\"xl35\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" font-weight=\"600\" fill=\"#ffffff\"><tspan x=\"30\" y=\"25\">Buy now</tspan></text></g></g><g id=\"xl36\" transform=\"translate(160 700)\" opacity=\"0.5\"><path d=\"M10 0L13 7L20 7L14 12L16 20L10 15L4 20L6 12L0 7L7 7Z\" fill=\"#ffc800\"/></g><g id=\"xl37\" transform=\"translate(260 700)\" opacity=\"0.9\"><g id=\"xl38\"><rect x=\"0\" y=\"0\" width=\"120\" height=\"40\" rx=\"20\" fill=\"#000000\"/></g><g id=\"xl39\"><text xml:space=\"preserve\" font-family=\"'Inter', sans-serif\" font-size=\"14\" fill=\"#ffffff\"><tspan x=\"0\" y=\"0\">Button</tspan></text></g></g></g></g></svg>",
+      "layers": [
+        {
+          "key": "xl1",
+          "name": "Mixed corners",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl2",
+          "name": "Linear",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl3",
+          "name": "Shape",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl4",
+          "name": "Rule",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl5",
+          "name": "Triangle",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl6",
+          "name": "Ring",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl7",
+          "name": "Photo",
+          "kind": "image",
+          "children": []
+        },
+        {
+          "key": "xl8",
+          "name": "Blob photo",
+          "kind": "image",
+          "children": []
+        },
+        {
+          "key": "xl9",
+          "name": "Missing image",
+          "kind": "image",
+          "children": []
+        },
+        {
+          "key": "xl10",
+          "name": "Vector image",
+          "kind": "image",
+          "children": []
+        },
+        {
+          "key": "xl12",
+          "name": "Union",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl13",
+          "name": "Centered line one second",
+          "kind": "text",
+          "children": [],
+          "text": "Centered line one  \nsecond   "
+        },
+        {
+          "key": "xl14",
+          "name": "Auto center",
+          "kind": "text",
+          "children": [],
+          "text": "Auto center"
+        },
+        {
+          "key": "xl15",
+          "name": "Right",
+          "kind": "text",
+          "children": [],
+          "text": "Right"
+        },
+        {
+          "key": "xl16",
+          "name": "Bold, red & <plain> text",
+          "kind": "text",
+          "children": [],
+          "text": "Bold, red & <plain> Text"
+        },
+        {
+          "key": "xl17",
+          "name": "no layout second third fourth",
+          "kind": "text",
+          "children": [],
+          "text": "no layout\r\nsecond\rthird\nfourth"
+        },
+        {
+          "key": "xl18",
+          "name": "title case, émigré words",
+          "kind": "text",
+          "children": [],
+          "text": "Title Case, Émigré Words"
+        },
+        {
+          "key": "xl19",
+          "name": "Straße",
+          "kind": "text",
+          "children": [],
+          "text": "Straße"
+        },
+        {
+          "key": "xl20",
+          "name": "Emoji 😀 ok then",
+          "kind": "text",
+          "children": [],
+          "text": "emoji 😀 ok then"
+        },
+        {
+          "key": "xl22",
+          "name": "Masked shadows",
+          "kind": "mask",
+          "children": [
+            {
+              "key": "xl23",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "xl24",
+          "name": "Scroller",
+          "kind": "mask",
+          "children": [
+            {
+              "key": "xl25",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "xl26",
+          "name": "Sideways",
+          "kind": "group",
+          "children": [
+            {
+              "key": "xl27",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "xl28",
+          "name": "Group",
+          "kind": "group",
+          "children": [
+            {
+              "key": "xl29",
+              "name": "A text layer whose name is much longer than for…",
+              "kind": "text",
+              "children": [],
+              "text": "  A text layer   whose name is much longer than forty-eight characters  "
+            }
+          ]
+        },
+        {
+          "key": "xl30",
+          "name": "Grid",
+          "kind": "group",
+          "children": [
+            {
+              "key": "xl31",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            }
+          ]
+        },
+        {
+          "key": "xl33",
+          "name": "Primary",
+          "kind": "group",
+          "children": [
+            {
+              "key": "xl34",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            },
+            {
+              "key": "xl35",
+              "name": "Buy now",
+              "kind": "text",
+              "children": [],
+              "text": "Buy now"
+            }
+          ]
+        },
+        {
+          "key": "xl36",
+          "name": "Star copy",
+          "kind": "component",
+          "children": []
+        },
+        {
+          "key": "xl37",
+          "name": "Alias",
+          "kind": "component",
+          "children": [
+            {
+              "key": "xl38",
+              "name": "Shape",
+              "kind": "shape",
+              "children": []
+            },
+            {
+              "key": "xl39",
+              "name": "Button",
+              "kind": "text",
+              "children": [],
+              "text": "Button"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "artboard-K2",
+      "name": "Pasteboard coords",
+      "width": 200,
+      "height": 150,
+      "skipped": 0,
+      "template": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"150\" viewBox=\"0 0 200 150\"><title>Pasteboard coords</title><clipPath id=\"artboard-clip\"><rect width=\"200\" height=\"150\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><g transform=\"translate(-1000 -200)\"><g id=\"content\"><g id=\"xl1\" transform=\"translate(1010 210)\"><rect x=\"0\" y=\"0\" width=\"50\" height=\"50\" fill=\"#000000\"/></g><g id=\"xl2\" transform=\"translate(1100 250)\"><circle cx=\"10\" cy=\"10\" r=\"10\" fill=\"#000000\"/></g><g id=\"xl3\" transform=\"translate(5 5)\"><rect x=\"0\" y=\"0\" width=\"5\" height=\"5\" fill=\"#000000\"/></g></g></g></g></svg>",
+      "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" height=\"150\" viewBox=\"0 0 200 150\"><title>Pasteboard coords</title><clipPath id=\"artboard-clip\"><rect width=\"200\" height=\"150\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><g transform=\"translate(-1000 -200)\"><g id=\"content\"><g id=\"xl1\" transform=\"translate(1010 210)\"><rect x=\"0\" y=\"0\" width=\"50\" height=\"50\" fill=\"#000000\"/></g><g id=\"xl2\" transform=\"translate(1100 250)\"><circle cx=\"10\" cy=\"10\" r=\"10\" fill=\"#000000\"/></g><g id=\"xl3\" transform=\"translate(5 5)\"><rect x=\"0\" y=\"0\" width=\"5\" height=\"5\" fill=\"#000000\"/></g></g></g></g></svg>",
+      "layers": [
+        {
+          "key": "xl1",
+          "name": "Shape",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl2",
+          "name": "Shape",
+          "kind": "shape",
+          "children": []
+        },
+        {
+          "key": "xl3",
+          "name": "Shape",
+          "kind": "shape",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "artboard-K3",
+      "name": "Legacy",
+      "width": 320,
+      "height": 200,
+      "skipped": 0,
+      "template": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"320\" height=\"200\" viewBox=\"0 0 320 200\"><title>Legacy</title><clipPath id=\"artboard-clip\"><rect width=\"320\" height=\"200\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><g id=\"content\"><g id=\"xl1\"><rect x=\"0\" y=\"0\" width=\"30\" height=\"30\" fill=\"#090909\"/></g></g></g></svg>",
+      "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"320\" height=\"200\" viewBox=\"0 0 320 200\"><title>Legacy</title><clipPath id=\"artboard-clip\"><rect width=\"320\" height=\"200\"/></clipPath><g clip-path=\"url(#artboard-clip)\"><g id=\"content\"><g id=\"xl1\"><rect x=\"0\" y=\"0\" width=\"30\" height=\"30\" fill=\"#090909\"/></g></g></g></svg>",
+      "layers": [
+        {
+          "key": "xl1",
+          "name": "Loose",
+          "kind": "shape",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "imageScale": 0,
+  "imageUris": {
+    "img1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAMklEQVR4nBXIQREAQAgDsQpDBHJ4IqUiELGuenN5RhJbIiNyIlKz1WSaXP8wWyZjciYPd8Mb0P6EGaUAAAAASUVORK5CYII=",
+    "img2": "data:image/jpeg;base64,/9j/4AAQSkZJRgA="
+  },
+  "imageNeeds": {
+    "img1": {
+      "w": 80,
+      "h": 60
+    },
+    "img2": {
+      "w": 50,
+      "h": 40
+    },
+    "vec1": {
+      "w": 20,
+      "h": 20
+    }
+  },
+  "preview": "image/png"
+}
